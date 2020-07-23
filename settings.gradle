@@ -1,0 +1,3 @@
+include ':hbluetooth'
+include ':app'
+rootProject.name = "HBluetooth"
