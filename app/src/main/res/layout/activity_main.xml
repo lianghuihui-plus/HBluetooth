@@ -32,6 +32,12 @@
             android:text="close bluetooth"/>
 
         <Button
+            android:id="@+id/discoverable_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="discoverable"/>
+
+        <Button
             android:id="@+id/start_discovery_button"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
