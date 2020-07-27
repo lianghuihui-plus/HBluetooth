@@ -6,6 +6,8 @@ public class BlueDevice {
 
     private String address;
 
+    private BlueDeviceStatus status = BlueDeviceStatus.DISCONNECTED;
+
     public BlueDevice(String name, String address) {
         this.name = name;
         this.address = address;
@@ -25,5 +27,13 @@ public class BlueDevice {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public BlueDeviceStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(BlueDeviceStatus status) {
+        this.status = status;
     }
 }

@@ -2,9 +2,13 @@ package com.lhh.hbluetooth;
 
 import android.bluetooth.BluetoothSocket;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * 蓝牙连接对象
+ */
 public class HBluetoothConnection {
 
     private String deviceName;
@@ -16,6 +20,8 @@ public class HBluetoothConnection {
     private InputStream inputStream;
 
     private OutputStream outputStream;
+
+    private boolean isClosed = false;
 
     public HBluetoothConnection(String deviceName, String devcieAddress, BluetoothSocket socket) {
         this.deviceName = deviceName;
@@ -61,5 +67,40 @@ public class HBluetoothConnection {
 
     public void setOutputStream(OutputStream outputStream) {
         this.outputStream = outputStream;
+    }
+
+    public boolean isClosed() {
+        return isClosed;
+    }
+
+    public void close() {
+        if (inputStream != null) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            inputStream = null;
+        }
+
+        if (outputStream != null) {
+            try {
+                outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            outputStream = null;
+        }
+
+        if (socket != null) {
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            socket = null;
+        }
+
+        isClosed = true;
     }
 }

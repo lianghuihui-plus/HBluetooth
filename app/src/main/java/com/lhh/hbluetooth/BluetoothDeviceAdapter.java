@@ -1,6 +1,5 @@
 package com.lhh.hbluetooth;
 
-import android.bluetooth.BluetoothDevice;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,13 +16,13 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
 
         View deviceView;
         TextView deviceNameText;
-        TextView deviceAddressText;
+        TextView deviceStatusText;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             deviceView = itemView;
             deviceNameText = itemView.findViewById(R.id.device_name);
-            deviceAddressText = itemView.findViewById(R.id.device_address);
+            deviceStatusText = itemView.findViewById(R.id.device_status);
         }
     }
 
@@ -42,12 +41,9 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.bluetooth_device_item,
                 parent, false);
         final ViewHolder holder = new ViewHolder(view);
-        holder.deviceView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                BlueDevice device = deviceList.get(holder.getAdapterPosition());
-                listener.onClick(device);
-            }
+        holder.deviceView.setOnClickListener(v -> {
+            BlueDevice device = deviceList.get(holder.getAdapterPosition());
+            listener.onClick(device);
         });
         return holder;
     }
@@ -56,7 +52,19 @@ public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDevice
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         BlueDevice device = deviceList.get(position);
         holder.deviceNameText.setText(device.getName());
-        holder.deviceAddressText.setText(device.getAddress());
+        String state = "";
+        switch (device.getStatus()) {
+            case DISCONNECTED:
+                state = "未连接";
+                break;
+            case CONNECTING:
+                state = "正在连接";
+                break;
+            case CONNECTED:
+                state = "已连接";
+                break;
+        }
+        holder.deviceStatusText.setText(state);
     }
 
     @Override
