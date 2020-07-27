@@ -6,18 +6,28 @@ import android.bluetooth.BluetoothSocket;
 import java.io.IOException;
 import java.util.UUID;
 
-public class HDeviceConnectThread extends Thread {
+/**
+ * 客户端连接线程
+ */
+public class HBConnectThread extends Thread {
+
+    public interface HBConnectCallback {
+
+        void onSuccess(HBConnection connection);
+
+        void onFailed(int code);
+    }
 
     private BluetoothDevice device;
 
     private UUID uuid;
 
-    private HDeviceConnectListener listener;
+    private HBConnectCallback callback;
 
-    public HDeviceConnectThread(BluetoothDevice device, UUID uuid, HDeviceConnectListener listener) {
+    public HBConnectThread(BluetoothDevice device, UUID uuid, HBConnectCallback callback) {
         this.device = device;
         this.uuid = uuid;
-        this.listener = listener;
+        this.callback = callback;
     }
 
     @Override
@@ -28,7 +38,7 @@ public class HDeviceConnectThread extends Thread {
         try {
             socket = device.createRfcommSocketToServiceRecord(uuid);
         } catch (IOException e) {
-            listener.onFailed(HBluetoothConstant.ERROR_CODE_BLUETOOTH_ADAPTER_IS_DISABLED);
+            callback.onFailed(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_IS_DISABLED);
             return;
         }
         try {
@@ -39,9 +49,9 @@ public class HDeviceConnectThread extends Thread {
             } catch (IOException closeException) {
                 closeException.printStackTrace();
             }
-            listener.onFailed(HBluetoothConstant.ERROR_CODE_CONNECT_DEVICE_FAILED);
+            callback.onFailed(HBConstant.ERROR_CODE_CONNECT_DEVICE_FAILED);
         }
-        HBluetoothConnection connection = new HBluetoothConnection(device.getName(), device.getAddress(), socket);
-        listener.onSuccess(connection);
+        HBConnection connection = new HBConnection(device.getName(), device.getAddress(), socket);
+        callback.onSuccess(connection);
     }
 }

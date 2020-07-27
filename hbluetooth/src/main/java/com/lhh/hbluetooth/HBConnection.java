@@ -8,8 +8,10 @@ import java.io.OutputStream;
 
 /**
  * 蓝牙连接对象
+ * 与蓝牙设备建立连接后，将会通过连接回调返回一个该对象
+ * 您应该通过该对象对当前的连接进行读、写等操作
  */
-public class HBluetoothConnection {
+public class HBConnection {
 
     private String deviceName;
 
@@ -23,7 +25,7 @@ public class HBluetoothConnection {
 
     private boolean isClosed = false;
 
-    public HBluetoothConnection(String deviceName, String devcieAddress, BluetoothSocket socket) {
+    public HBConnection(String deviceName, String devcieAddress, BluetoothSocket socket) {
         this.deviceName = deviceName;
         this.devcieAddress = devcieAddress;
         this.socket = socket;
@@ -33,40 +35,8 @@ public class HBluetoothConnection {
         return deviceName;
     }
 
-    public void setDeviceName(String deviceName) {
-        this.deviceName = deviceName;
-    }
-
     public String getDevcieAddress() {
         return devcieAddress;
-    }
-
-    public void setDevcieAddress(String devcieAddress) {
-        this.devcieAddress = devcieAddress;
-    }
-
-    public BluetoothSocket getSocket() {
-        return socket;
-    }
-
-    public void setSocket(BluetoothSocket socket) {
-        this.socket = socket;
-    }
-
-    public InputStream getInputStream() {
-        return inputStream;
-    }
-
-    public void setInputStream(InputStream inputStream) {
-        this.inputStream = inputStream;
-    }
-
-    public OutputStream getOutputStream() {
-        return outputStream;
-    }
-
-    public void setOutputStream(OutputStream outputStream) {
-        this.outputStream = outputStream;
     }
 
     public boolean isClosed() {

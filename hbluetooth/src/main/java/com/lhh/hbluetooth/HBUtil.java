@@ -5,44 +5,49 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
-import android.provider.SyncStateContract;
 import android.util.Log;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
-public class HBluetoothUtil {
+/**
+ * 蓝牙工具类
+ */
+public class HBUtil {
 
     private static final String TAG = "HBluetoothUtil";
 
-    private static HBluetoothUtil sInstance;
+    private volatile static HBUtil sInstance;
 
     private BluetoothAdapter mAdapter;
 
-    private HashMap<String, HBluetoothConnection> mConnectionHashMap = new HashMap<>();
+    private HashMap<String, HBConnection> mConnectionHashMap = new HashMap<>();
 
-    private HBluetoothAcceptTask mAcceptTask;
+    private HBAcceptThread mAcceptThread;
 
-    public static HBluetoothUtil getInstance() {
+    public static HBUtil getInstance() {
         if (sInstance == null) {
-            sInstance = new HBluetoothUtil();
+            synchronized (HBUtil.class) {
+                if (sInstance == null) {
+                    sInstance = new HBUtil();
+                }
+            }
         }
         return sInstance;
     }
 
-    public HBluetoothUtil() {
+    public HBUtil() {
 
     }
 
     /**
      * 初始化工作，获取设备的蓝牙适配器
-     * @throws HAdapterUnavaliableException 蓝牙适配器不可用
+     * @throws HBAdapterUnavailableException 蓝牙适配器不可用
      */
-    public void init() throws HAdapterUnavaliableException {
+    public void init() throws HBAdapterUnavailableException {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
-            throw new HAdapterUnavaliableException();
+            throw new HBAdapterUnavailableException();
         }
         mAdapter = adapter;
     }
@@ -59,7 +64,7 @@ public class HBluetoothUtil {
      * 蓝牙适配器是否已启用
      * @return 是否启用
      */
-    public boolean isAdapterEnalbed() {
+    public boolean isAdapterEnabled() {
         if (mAdapter == null) {
             return false;
         }
@@ -72,7 +77,7 @@ public class HBluetoothUtil {
      */
     public void enableAdapter(Activity activity) {
         Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        activity.startActivityForResult(intent, HBluetoothConstant.REQ_CODE_ACTION_REQUEST_ENABLE);
+        activity.startActivityForResult(intent, HBConstant.REQ_CODE_ACTION_REQUEST_ENABLE);
     }
 
     /**
@@ -83,7 +88,7 @@ public class HBluetoothUtil {
     public void setDiscoverable(Activity activity, int duration) {
         Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, duration);
-        activity.startActivityForResult(intent, HBluetoothConstant.REQ_CODE_ACTION_REQUEST_DISCOVERABLE);
+        activity.startActivityForResult(intent, HBConstant.REQ_CODE_ACTION_REQUEST_DISCOVERABLE);
     }
 
     /**
@@ -111,27 +116,27 @@ public class HBluetoothUtil {
     }
 
     /**
-     * 开始接受蓝牙设备的连接，会结束之前已存在的任务
+     * 开始接受蓝牙设备的连接，若重复调用，旧的线程会被覆盖
      * @param name 服务名
      * @param uuid UUID
-     * @param listener 连接的回调
+     * @param callback 连接的回调
      */
-    public void startAccept(String name, UUID uuid, HServerAcceptListener listener) {
+    public void startAccept(String name, UUID uuid, HBAcceptThread.AcceptCallback callback) {
         cancelAccept();
 
-        mAcceptTask = new HBluetoothAcceptTask(mAdapter, name, uuid, new HServerAcceptListener() {
+        mAcceptThread = new HBAcceptThread(mAdapter, name, uuid, new HBAcceptThread.AcceptCallback() {
             @Override
-            public void onClientConnect(HBluetoothConnection connection) {
+            public void onClientConnected(HBConnection connection) {
                 addConnection(connection);
-                listener.onClientConnect(connection);
+                callback.onClientConnected(connection);
             }
 
             @Override
-            public void onFailed(Exception e) {
-                listener.onFailed(e);
+            public void onFailed(int code) {
+                callback.onFailed(code);
             }
         });
-        mAcceptTask.execute();
+        mAcceptThread.start();
     }
 
     /**
@@ -139,52 +144,59 @@ public class HBluetoothUtil {
      */
     public boolean cancelAccept() {
         boolean isSuccess = false;
-        if (mAcceptTask != null) {
-            isSuccess = mAcceptTask.cancel(true);
-            mAcceptTask = null;
+        if (mAcceptThread != null) {
+            mAcceptThread.cancel();
+            mAcceptThread = null;
+            isSuccess = true;
         }
         return isSuccess;
     }
 
-    public void connectDevice(String address, UUID uuid, HDeviceConnectListener listener) {
+    /**
+     * 作为客户端连接目标蓝牙设备
+     * @param address 目标设备地址
+     * @param uuid UUID
+     * @param callback 连接的回调
+     */
+    public void connectDevice(String address, UUID uuid, HBConnectThread.HBConnectCallback callback) {
         if (isDeviceAlreadyConnected(address)) {
-            listener.onAlreadyConnected();
+            callback.onFailed(HBConstant.ERROR_CODE_DEVICE_ALREADY_CONNECTED);
             return;
         }
 
-        //连接蓝牙前需要停止搜索
+        //连接蓝牙前需要停止搜索,很重要
         cancelDiscovery();
 
         BluetoothDevice device;
         try {
             device = mAdapter.getRemoteDevice(address);
         } catch (IllegalArgumentException e) {
-            listener.onFailed(HBluetoothConstant.ERROR_CODE_INVALID_DEVICE_ADDRESS);
+            callback.onFailed(HBConstant.ERROR_CODE_INVALID_DEVICE_ADDRESS);
             return;
         }
 
-        new HDeviceConnectThread(device, uuid, new HDeviceConnectListener() {
+        new HBConnectThread(device, uuid, new HBConnectThread.HBConnectCallback() {
             @Override
-            public void onSuccess(HBluetoothConnection connection) {
+            public void onSuccess(HBConnection connection) {
                 addConnection(connection);
-                listener.onSuccess(connection);
-            }
-
-            @Override
-            public void onAlreadyConnected() {
-                listener.onAlreadyConnected();
+                callback.onSuccess(connection);
             }
 
             @Override
             public void onFailed(int code) {
-                listener.onFailed(code);
+                callback.onFailed(code);
             }
         }).start();
     }
 
+    /**
+     * 根据目标设备地址断开与其的连接
+     * @param address 目标设备蓝牙地址
+     * @return true：成功与目标断开连接；false：未与目标设备连接
+     */
     public boolean disconnectDevice(String address) {
         if (mConnectionHashMap.containsKey(address)) {
-            HBluetoothConnection connection = mConnectionHashMap.get(address);
+            HBConnection connection = mConnectionHashMap.get(address);
             connection.close();
             mConnectionHashMap.remove(connection);
             return true;
@@ -197,7 +209,7 @@ public class HBluetoothUtil {
      * 将蓝牙连接对象保存到Hash中，若相同设备的连接已存在，则销毁当前连接
      * @param connection 蓝牙连接对象
      */
-    private void addConnection(HBluetoothConnection connection) {
+    private void addConnection(HBConnection connection) {
         if (!mConnectionHashMap.containsKey(connection.getDevcieAddress())) {
             mConnectionHashMap.put(connection.getDevcieAddress(), connection);
         } else {
@@ -211,7 +223,7 @@ public class HBluetoothUtil {
      */
     private void addConnection(BluetoothSocket socket) {
         BluetoothDevice device = socket.getRemoteDevice();
-        HBluetoothConnection connection = new HBluetoothConnection(device.getName(),
+        HBConnection connection = new HBConnection(device.getName(),
                 device.getAddress(), socket);
         addConnection(connection);
     }
@@ -228,7 +240,7 @@ public class HBluetoothUtil {
 
         cancelAccept();
 
-        for (HBluetoothConnection connection: mConnectionHashMap.values()) {
+        for (HBConnection connection: mConnectionHashMap.values()) {
             connection.close();
         }
     }

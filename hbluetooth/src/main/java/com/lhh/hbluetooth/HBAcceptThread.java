@@ -4,12 +4,21 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
-import android.os.AsyncTask;
 
 import java.io.IOException;
 import java.util.UUID;
 
-public class HBluetoothAcceptTask extends AsyncTask<Void, Void, Void> {
+/**
+ * 服务端等待连接线程
+ */
+public class HBAcceptThread extends Thread {
+
+    public interface AcceptCallback {
+
+        void onClientConnected(HBConnection connection);
+
+        void onFailed(int code);
+    }
 
     private BluetoothAdapter adapter;
 
@@ -17,32 +26,35 @@ public class HBluetoothAcceptTask extends AsyncTask<Void, Void, Void> {
 
     private java.util.UUID uuid;
 
-    private HServerAcceptListener listener;
+    private AcceptCallback callback;
 
     private BluetoothServerSocket serverSocket;
 
-    public HBluetoothAcceptTask(BluetoothAdapter adapter, String name, UUID uuid, HServerAcceptListener listener) {
+    private volatile boolean exit = false;
+
+    public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, AcceptCallback callback) {
         this.adapter = adapter;
         this.name = name;
         this.uuid = uuid;
-        this.listener = listener;
+        this.callback = callback;
     }
 
     @Override
-    protected Void doInBackground(Void... voids) {
+    public void run() {
+        super.run();
         try {
             serverSocket = adapter.listenUsingRfcommWithServiceRecord(name, uuid);
             BluetoothDevice device;
-            HBluetoothConnection connection;
-            while (true) {
+            HBConnection connection;
+            while (!exit) {
                 BluetoothSocket socket = serverSocket.accept();
                 device = socket.getRemoteDevice();
-                connection = new HBluetoothConnection(device.getName(), device.getAddress(), socket);
-                listener.onClientConnect(connection);
+                connection = new HBConnection(device.getName(), device.getAddress(), socket);
+                callback.onClientConnected(connection);
             }
         } catch (IOException e) {
             e.printStackTrace();
-            listener.onFailed(e);
+            callback.onFailed(HBConstant.ERROR_CODE_ACCEPT_FAILED);
         } finally {
             try {
                 serverSocket.close();
@@ -50,6 +62,9 @@ public class HBluetoothAcceptTask extends AsyncTask<Void, Void, Void> {
                 e.printStackTrace();
             }
         }
-        return null;
+    }
+
+    public void cancel() {
+        exit = true;
     }
 }
