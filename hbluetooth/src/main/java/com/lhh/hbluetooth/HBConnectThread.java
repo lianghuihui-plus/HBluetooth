@@ -50,6 +50,7 @@ public class HBConnectThread extends Thread {
                 closeException.printStackTrace();
             }
             callback.onFailed(HBConstant.ERROR_CODE_CONNECT_DEVICE_FAILED);
+            return;
         }
         HBConnection connection = new HBConnection(device.getName(), device.getAddress(), socket);
         callback.onSuccess(connection);

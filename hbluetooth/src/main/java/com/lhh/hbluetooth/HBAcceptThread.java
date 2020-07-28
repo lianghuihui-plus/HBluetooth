@@ -48,6 +48,10 @@ public class HBAcceptThread extends Thread {
             HBConnection connection;
             while (!exit) {
                 BluetoothSocket socket = serverSocket.accept();
+                if (exit) {
+                    socket.close();
+                    break;
+                }
                 device = socket.getRemoteDevice();
                 connection = new HBConnection(device.getName(), device.getAddress(), socket);
                 callback.onClientConnected(connection);

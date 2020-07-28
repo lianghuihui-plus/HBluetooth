@@ -94,25 +94,21 @@ public class HBUtil {
     /**
      * 开始搜索蓝牙设备
      */
-    public void startDiscovery() {
-        if (mAdapter == null) {
-            Log.w(TAG, "startDiscovery: BluetoothAdapter is Undefined!");
+    public boolean startDiscovery() {
+        if (mAdapter == null || mAdapter.isDiscovering()) {
+            return false;
         }
-        if (!mAdapter.isDiscovering()) {
-            mAdapter.startDiscovery();
-        }
+        return mAdapter.startDiscovery();
     }
 
     /**
      * 停止搜索蓝牙设备
      */
-    public void cancelDiscovery() {
-        if (mAdapter == null) {
-            Log.w(TAG, "startDiscovery: BluetoothAdapter is Undefined!");
+    public boolean cancelDiscovery() {
+        if (mAdapter == null || !mAdapter.isDiscovering()) {
+            return false;
         }
-        if (mAdapter.isDiscovering()) {
-            mAdapter.cancelDiscovery();
-        }
+        return mAdapter.cancelDiscovery();
     }
 
     /**
@@ -128,6 +124,7 @@ public class HBUtil {
             @Override
             public void onClientConnected(HBConnection connection) {
                 addConnection(connection);
+                connection.startRead();
                 callback.onClientConnected(connection);
             }
 
@@ -178,6 +175,7 @@ public class HBUtil {
         new HBConnectThread(device, uuid, new HBConnectThread.HBConnectCallback() {
             @Override
             public void onSuccess(HBConnection connection) {
+                connection.startRead();
                 addConnection(connection);
                 callback.onSuccess(connection);
             }
@@ -198,11 +196,18 @@ public class HBUtil {
         if (mConnectionHashMap.containsKey(address)) {
             HBConnection connection = mConnectionHashMap.get(address);
             connection.close();
-            mConnectionHashMap.remove(connection);
+            mConnectionHashMap.remove(connection.getDevcieAddress());
             return true;
         } else {
             return false;
         }
+    }
+
+    public HBConnection getConnection(String address) {
+        if (mConnectionHashMap.containsKey(address)) {
+            return mConnectionHashMap.get(address);
+        }
+        return null;
     }
 
     /**
@@ -243,5 +248,6 @@ public class HBUtil {
         for (HBConnection connection: mConnectionHashMap.values()) {
             connection.close();
         }
+        mConnectionHashMap.clear();
     }
 }

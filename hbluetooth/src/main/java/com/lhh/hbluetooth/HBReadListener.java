@@ -1,4 +1,7 @@
 package com.lhh.hbluetooth;
 
-interface HBReadListener {
+public interface HBReadListener {
+    void onRead(byte[] cache);
+
+    void onFailed();
 }
