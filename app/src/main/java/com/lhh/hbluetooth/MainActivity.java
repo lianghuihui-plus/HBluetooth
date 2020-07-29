@@ -38,7 +38,6 @@ public class MainActivity extends BaseActivity {
                         showToast("Bluetooth Adapter Is On.");
                     } else if (state == BluetoothAdapter.STATE_OFF) {
                         showToast("Bluetooth Adapter Is Off.");
-                        HBUtil.getInstance().release();
                         mDeviceList.clear();
                         runOnUiThread(() -> mDeviceAdapter.notifyDataSetChanged());
                     } else if (state == BluetoothAdapter.ERROR) {
@@ -61,12 +60,6 @@ public class MainActivity extends BaseActivity {
                         mDeviceAdapter.notifyItemInserted(mDeviceList.size()-1);
                     }
                     break;
-                case BluetoothDevice.ACTION_ACL_DISCONNECTED:
-                    BluetoothDevice disconnectedDeivce = intent
-                            .getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    HBUtil.getInstance().disconnectDevice(disconnectedDeivce.getAddress());
-                    refreshDeviceState(disconnectedDeivce.getAddress(), BlueDeviceStatus.DISCONNECTED);
-                    break;
             }
         }
     };
@@ -77,7 +70,7 @@ public class MainActivity extends BaseActivity {
         if (HBUtil.getInstance().isAdapterEnabled()) {
             showToast("Bluetooth Adapter Is Alreay Enabled.");
         } else {
-            HBUtil.getInstance().enableAdapter(this);
+            HBUtil.getInstance().requestEnableAdapter(this);
         }
     }
 
@@ -91,7 +84,7 @@ public class MainActivity extends BaseActivity {
 
     @OnClick(R.id.discoverable_button) void discoverable() {
         if (HBUtil.getInstance().isAdapterEnabled()) {
-            HBUtil.getInstance().setDiscoverable(this, 150);
+            HBUtil.getInstance().requestDiscoverable(this, 150);
         } else {
             showToast("Bluetooth Adapter Is Disabled!");
         }
@@ -133,6 +126,23 @@ public class MainActivity extends BaseActivity {
                 @Override
                 public void onClientConnected(HBConnection connection) {
                     showToast("Device Connected: " + connection.getDeviceName());
+                    connection.startRead();
+                    connection.registerListener(MainActivity.class.getName(), new HBConnectionListener() {
+                        @Override
+                        public void onDisconnected(String address) {
+                            refreshDeviceState(address, BlueDeviceStatus.DISCONNECTED);
+                        }
+
+                        @Override
+                        public void onRead(byte[] cache) {
+
+                        }
+
+                        @Override
+                        public void onError(int code) {
+
+                        }
+                    });
                     if (listContains(connection.getDevcieAddress())) {
                         refreshDeviceState(connection.getDevcieAddress(), BlueDeviceStatus.CONNECTED);
                     } else {
@@ -245,28 +255,34 @@ public class MainActivity extends BaseActivity {
                         UUID.fromString(Constant.SPP_UUID),
                         new HBConnectThread.HBConnectCallback() {
                             @Override
-                            public void onSuccess(HBConnection connection) {
+                            public void onConnected(HBConnection connection) {
                                 Log.d(TAG, "onSuccess: connect device: " +
                                         connection.getDeviceName());
+                                connection.startRead();
                                 refreshDeviceState(connection.getDevcieAddress(),
                                         BlueDeviceStatus.CONNECTED);
                                 showToast("Device " + connection.getDeviceName()
                                         + " Is Connected Success.");
-                                connection.registerReadListener(MainActivity.class.getName(), new HBReadListener() {
+                                connection.registerListener(MainActivity.class.getName(), new HBConnectionListener() {
+                                    @Override
+                                    public void onDisconnected(String address) {
+                                        refreshDeviceState(address, BlueDeviceStatus.DISCONNECTED);
+                                    }
+
                                     @Override
                                     public void onRead(byte[] cache) {
                                         Log.d(TAG, "onRead: " + cache.toString());
                                     }
 
                                     @Override
-                                    public void onFailed() {
-                                        Log.d(TAG, "onFailed: ");
+                                    public void onError(int code) {
+                                        Log.d(TAG, "onError: " + code);
                                     }
                                 });
                             }
 
                             @Override
-                            public void onFailed(int code) {
+                            public void onError(int code) {
                                 showToast("Connect Device Failed With Code " + code);
                                 refreshDeviceState(device.getAddress(), BlueDeviceStatus.DISCONNECTED);
                             }
@@ -294,7 +310,6 @@ public class MainActivity extends BaseActivity {
         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
-        intentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         registerReceiver(mBroadcastReceiver, intentFilter);
     }
 

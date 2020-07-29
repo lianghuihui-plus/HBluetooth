@@ -35,7 +35,7 @@ public class HBReadThread extends Thread {
                 bufferLen = inputStream.read(readBuffer);
             } catch (IOException e) {
                 e.printStackTrace();
-                listener.onFailed();
+                listener.onError(HBConstant.ERROR_CODE_READ_FAILED);
                 break;
             }
             if (bufferLen > 0) {

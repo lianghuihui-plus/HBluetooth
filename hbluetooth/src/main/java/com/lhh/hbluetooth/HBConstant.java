@@ -20,4 +20,8 @@ public class HBConstant {
     public static final int ERROR_CODE_CONNECT_DEVICE_FAILED = 0x0204;
     //517 接受客户端连接失败，未知原因
     public static final int ERROR_CODE_ACCEPT_FAILED = 0x0205;
+    //518 读取蓝牙信息失败，未知原因
+    public static final int ERROR_CODE_READ_FAILED = 0x0206;
+    //519 服务未启动
+    public static final int ERROR_CODE_SERVICE_NOT_START = 0x0207;
 }

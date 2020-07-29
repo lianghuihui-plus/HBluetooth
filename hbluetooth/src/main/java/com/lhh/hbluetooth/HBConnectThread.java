@@ -13,9 +13,9 @@ public class HBConnectThread extends Thread {
 
     public interface HBConnectCallback {
 
-        void onSuccess(HBConnection connection);
+        void onConnected(HBConnection connection);
 
-        void onFailed(int code);
+        void onError(int code);
     }
 
     private BluetoothDevice device;
@@ -38,7 +38,7 @@ public class HBConnectThread extends Thread {
         try {
             socket = device.createRfcommSocketToServiceRecord(uuid);
         } catch (IOException e) {
-            callback.onFailed(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_IS_DISABLED);
+            callback.onError(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_IS_DISABLED);
             return;
         }
         try {
@@ -49,10 +49,10 @@ public class HBConnectThread extends Thread {
             } catch (IOException closeException) {
                 closeException.printStackTrace();
             }
-            callback.onFailed(HBConstant.ERROR_CODE_CONNECT_DEVICE_FAILED);
+            callback.onError(HBConstant.ERROR_CODE_CONNECT_DEVICE_FAILED);
             return;
         }
         HBConnection connection = new HBConnection(device.getName(), device.getAddress(), socket);
-        callback.onSuccess(connection);
+        callback.onConnected(connection);
     }
 }

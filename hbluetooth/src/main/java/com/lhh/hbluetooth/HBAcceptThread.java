@@ -24,7 +24,7 @@ public class HBAcceptThread extends Thread {
 
     private String name;
 
-    private java.util.UUID uuid;
+    private UUID uuid;
 
     private AcceptCallback callback;
 

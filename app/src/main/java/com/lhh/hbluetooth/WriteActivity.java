@@ -2,7 +2,6 @@ package com.lhh.hbluetooth;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -40,7 +39,13 @@ public class WriteActivity extends BaseActivity {
         String address = intent.getStringExtra("address");
         mConnection = HBUtil.getInstance().getConnection(address);
 
-        mConnection.registerReadListener(WriteActivity.class.getName(), new HBReadListener() {
+        mConnection.registerListener(WriteActivity.class.getName(), new HBConnectionListener() {
+            @Override
+            public void onDisconnected(String address) {
+                showToast("Connction is Disconnected!");
+                finish();
+            }
+
             @Override
             public void onRead(byte[] cache) {
                 runOnUiThread(() -> {
@@ -49,7 +54,7 @@ public class WriteActivity extends BaseActivity {
             }
 
             @Override
-            public void onFailed() {
+            public void onError(int code) {
 
             }
         });
@@ -58,7 +63,7 @@ public class WriteActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mConnection.unregisterReadListener(WriteActivity.class.getName());
+        mConnection.unregisterListener(WriteActivity.class.getName());
     }
 
     @Override
