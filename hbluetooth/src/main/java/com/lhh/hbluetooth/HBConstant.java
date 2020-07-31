@@ -24,4 +24,6 @@ public class HBConstant {
     public static final int ERROR_CODE_READ_FAILED = 0x0206;
     //519 服务未启动
     public static final int ERROR_CODE_SERVICE_NOT_START = 0x0207;
+    //520 蓝牙不可用
+    public static final int ERROR_CODE_BLUETOOTH_ADAPTER_UNAVAILABLE = 0x0208;
 }

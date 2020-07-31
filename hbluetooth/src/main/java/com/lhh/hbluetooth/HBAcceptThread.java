@@ -30,8 +30,6 @@ public class HBAcceptThread extends Thread {
 
     private BluetoothServerSocket serverSocket;
 
-    private volatile boolean exit = false;
-
     public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, AcceptCallback callback) {
         this.adapter = adapter;
         this.name = name;
@@ -46,12 +44,8 @@ public class HBAcceptThread extends Thread {
             serverSocket = adapter.listenUsingRfcommWithServiceRecord(name, uuid);
             BluetoothDevice device;
             HBConnection connection;
-            while (!exit) {
+            while (true) {
                 BluetoothSocket socket = serverSocket.accept();
-                if (exit) {
-                    socket.close();
-                    break;
-                }
                 device = socket.getRemoteDevice();
                 connection = new HBConnection(device.getName(), device.getAddress(), socket);
                 callback.onClientConnected(connection);
@@ -69,6 +63,10 @@ public class HBAcceptThread extends Thread {
     }
 
     public void cancel() {
-        exit = true;
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

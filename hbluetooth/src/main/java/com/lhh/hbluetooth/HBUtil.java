@@ -1,7 +1,6 @@
 package com.lhh.hbluetooth;
 
 import android.app.Activity;
-import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
@@ -18,10 +17,17 @@ import java.util.UUID;
  */
 public class HBUtil {
 
+    public interface HBInitCallback {
+        void onSuccess();
+
+        void onError(int code);
+    }
+
     private ServiceConnection mConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             mBinder = (HBService.HBBinder)service;
+            mCallback.onSuccess();
         }
 
         @Override
@@ -35,6 +41,8 @@ public class HBUtil {
     private BluetoothAdapter mAdapter;
 
     private HBService.HBBinder mBinder;
+
+    private HBInitCallback mCallback;
 
     public static HBUtil getInstance() {
         if (sInstance == null) {
@@ -50,18 +58,21 @@ public class HBUtil {
     public HBUtil() {
     }
 
-    public static void initialize(Application application) {
-        HBApplication.setContext(application.getApplicationContext());
+    public static void initialize(Context context) {
+        HBApplication.setContext(context);
     }
 
     /**
-     * 初始化工作，获取设备的蓝牙适配器
-     * @throws HBAdapterUnavailableException 蓝牙适配器不可用
+     * 初始化工作
+     * @param callback 初始化结果回调
      */
-    public void init() throws HBAdapterUnavailableException {
+    public void init(HBInitCallback callback) {
+        mCallback = callback;
+
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
-            throw new HBAdapterUnavailableException();
+            callback.onError(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_UNAVAILABLE);
+            return;
         }
         mAdapter = adapter;
 

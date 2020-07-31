@@ -194,12 +194,17 @@ public class MainActivity extends BaseActivity {
 
         registerReceiver();
 
-        try {
-            HBUtil.getInstance().init();
-        } catch (HBAdapterUnavailableException e) {
-            showToast("Bluetooth is Unavailable!");
-            delayFinish(3000);
-        }
+        HBUtil.getInstance().init(new HBUtil.HBInitCallback() {
+            @Override
+            public void onSuccess() {
+
+            }
+
+            @Override
+            public void onError(int code) {
+                delayFinish(3000);
+            }
+        });
     }
 
     @Override
