@@ -63,19 +63,16 @@ public class HBUtil {
     }
 
     /**
-     * 初始化工作
-     * @param callback 初始化结果回调
+     * 初始化工作，获取设备的蓝牙适配器
      */
     public void init(HBInitCallback callback) {
         mCallback = callback;
-
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
             callback.onError(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_UNAVAILABLE);
             return;
         }
         mAdapter = adapter;
-
         startService();
     }
 
