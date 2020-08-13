@@ -1,26 +1,14 @@
 package com.lhh.hbluetooth;
 
 import android.bluetooth.BluetoothSocket;
-import android.util.Log;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 
-import static android.content.ContentValues.TAG;
-
 /**
  * 蓝牙连接对象，使用了观察者模式
- * 与蓝牙设备建立连接后，将会通过连接回调返回一个该对象
- * 您并不需要在建立连接后保存该对象，因为您可以随时根据蓝牙地址从{@link HBUtil}中获取到该连接对象
- * 您应该通过该对象对当前的连接进行读、写等操作
- * 您需要通过注册一个观察者来获取该对象下发的通知信息
- * 一个连接对象可以注册多个观察者
- * 连接对象被告知连接已失效后会通知所有观察者，然后取消所有的注册，最后释放资源
- * ！！！请不要直接通过调用连接对象的die()方法来断开该连接！！！
- * 应该通过{@link HBUtil}disconnectDevice()方法来断开连接
- * 因为直接通过die()方法虽然可以断开一个连接，但该连接的实例仍然作为可用的连接被保存起来
  */
 public class HBConnection {
 
