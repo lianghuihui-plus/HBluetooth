@@ -1,11 +1,14 @@
 package com.lhh.hbluetooth;
 
 import android.bluetooth.BluetoothSocket;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
+
+import static android.content.ContentValues.TAG;
 
 /**
  * 蓝牙连接对象，使用了观察者模式
@@ -110,8 +113,8 @@ public class HBConnection {
         connectionListenerHashMap.remove(key);
     }
 
-    public void write(byte[] bytes) {
-        if (state == CONNECTION_STATE_DEAD) return;
+    public boolean write(byte[] bytes) {
+        if (state == CONNECTION_STATE_DEAD) return false;
         try {
             if (outputStream == null) {
                 outputStream = socket.getOutputStream();
@@ -120,7 +123,9 @@ public class HBConnection {
             outputStream.flush();
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
+        return true;
     }
 
     public void die() {

@@ -52,7 +52,6 @@ public class HBAcceptThread extends Thread {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            callback.onFailed(HBConstant.ERROR_CODE_ACCEPT_FAILED);
         } finally {
             try {
                 serverSocket.close();
