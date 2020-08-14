@@ -77,6 +77,7 @@ public class HBConnection {
                     for (HBConnectionListener listener: connectionListenerHashMap.values()) {
                         listener.onError(code);
                     }
+                    HBUtil.getInstance().disconnectDevice(devcieAddress);
                 }
             });
             readThread.start();
@@ -125,9 +126,9 @@ public class HBConnection {
     }
 
     private void release() {
-        stopRead();
-
         connectionListenerHashMap.clear();
+
+        stopRead();
 
         if (outputStream != null) {
             try {

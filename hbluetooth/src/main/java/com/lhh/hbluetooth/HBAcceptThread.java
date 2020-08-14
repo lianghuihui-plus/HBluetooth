@@ -30,6 +30,8 @@ public class HBAcceptThread extends Thread {
 
     private BluetoothServerSocket serverSocket;
 
+    private boolean userCanceled = false;
+
     public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, AcceptCallback callback) {
         this.adapter = adapter;
         this.name = name;
@@ -52,6 +54,9 @@ public class HBAcceptThread extends Thread {
             }
         } catch (IOException e) {
             e.printStackTrace();
+            if (!userCanceled) {
+                callback.onFailed(HBConstant.ERROR_CODE_ACCEPT_FAILED);
+            }
         } finally {
             try {
                 serverSocket.close();
@@ -63,6 +68,7 @@ public class HBAcceptThread extends Thread {
 
     public void cancel() {
         try {
+            userCanceled = true;
             serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
