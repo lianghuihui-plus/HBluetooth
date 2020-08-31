@@ -9,7 +9,6 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -230,7 +229,7 @@ public class HBUtil {
      * 获取所有的连接对象
      * @return 连接对象列表
      */
-    public List<HBConnection> getAllConnection() {
+    public java.util.List<HBConnection> getAllConnection() {
         if (mBinder == null) return null;
         return mBinder.getAllConnection();
     }

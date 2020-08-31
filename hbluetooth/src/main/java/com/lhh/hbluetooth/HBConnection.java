@@ -3,9 +3,10 @@ package com.lhh.hbluetooth;
 import android.bluetooth.BluetoothSocket;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static android.content.ContentValues.TAG;
 
 /**
  * 蓝牙连接对象，使用了观察者模式
@@ -24,11 +25,12 @@ public class HBConnection {
 
     private BluetoothSocket socket;
 
-    private OutputStream outputStream;
+    private java.io.OutputStream outputStream;
 
     private HBReadThread readThread;
 
-    private HashMap<String, HBConnectionListener> connectionListenerHashMap = new HashMap<>();
+    private ConcurrentHashMap<String, HBConnectionListener> connectionListenerHashMap
+            = new ConcurrentHashMap<>();
 
     private byte[] readCache;
 
@@ -64,6 +66,7 @@ public class HBConnection {
                         System.arraycopy(cache, 0, tmp, readCache.length, cache.length);
                         readCache = tmp;
                     }
+
                     if (connectionListenerHashMap.size() > 0) {
                         for (HBConnectionListener listener: connectionListenerHashMap.values()) {
                             listener.onRead(readCache);
@@ -108,8 +111,11 @@ public class HBConnection {
             if (outputStream == null) {
                 outputStream = socket.getOutputStream();
             }
+            android.util.Log.i(TAG, "write: start");
             outputStream.write(bytes);
+            android.util.Log.i(TAG, "write: end");
             outputStream.flush();
+            android.util.Log.i(TAG, "flush: end");
         } catch (IOException e) {
             e.printStackTrace();
             return false;

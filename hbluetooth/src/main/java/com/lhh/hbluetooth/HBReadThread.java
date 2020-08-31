@@ -3,12 +3,11 @@ package com.lhh.hbluetooth;
 import android.bluetooth.BluetoothSocket;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 
 public class HBReadThread extends Thread {
 
-    private InputStream inputStream;
+    private java.io.InputStream inputStream;
 
     private HBReadListener listener;
 

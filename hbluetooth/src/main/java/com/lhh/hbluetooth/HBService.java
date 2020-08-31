@@ -1,6 +1,5 @@
 package com.lhh.hbluetooth;
 
-import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -12,13 +11,12 @@ import android.os.IBinder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
 
 /**
  * 蓝牙服务类
  */
-public class HBService extends Service {
+public class HBService extends android.app.Service {
 
     public class HBBinder extends Binder {
         public void startAccpet(BluetoothAdapter adapter, String name, UUID uuid,
@@ -43,7 +41,7 @@ public class HBService extends Service {
             return HBService.this.getConnection(address);
         }
 
-        public List<HBConnection> getAllConnection() {
+        public java.util.List<HBConnection> getAllConnection() {
             return HBService.this.getAllConnection();
         }
 
@@ -237,7 +235,7 @@ public class HBService extends Service {
         return null;
     }
 
-    public List<HBConnection> getAllConnection() {
+    public java.util.List<HBConnection> getAllConnection() {
         return new ArrayList<>(mConnectionHashMap.values());
     }
 
