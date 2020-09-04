@@ -20,6 +20,8 @@ public class HBAcceptThread extends Thread {
         void onFailed(int code);
     }
 
+    private static final String TAG = "HBAcceptThread";
+
     private BluetoothAdapter adapter;
 
     private String name;
@@ -33,6 +35,7 @@ public class HBAcceptThread extends Thread {
     private boolean userCanceled = false;
 
     public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, AcceptCallback callback) {
+        HBLog.i(TAG, "[AcceptThread-" + name + "] Accept thread create: " + uuid);
         this.adapter = adapter;
         this.name = name;
         this.uuid = uuid;
@@ -53,25 +56,41 @@ public class HBAcceptThread extends Thread {
                 callback.onClientConnected(connection);
             }
         } catch (IOException e) {
-            e.printStackTrace();
             if (!userCanceled) {
+                HBLog.e(TAG, "[AcceptThread-" + name + "] Accept device failed: "
+                        + e.getMessage());
                 callback.onFailed(HBConstant.ERROR_CODE_ACCEPT_FAILED);
+            } else {
+                serverSocket = null;
             }
         } finally {
-            try {
-                serverSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            release();
         }
     }
 
     public void cancel() {
+        HBLog.i(TAG, "[AcceptThread-" + name + "] Cancel");
+        userCanceled = true;
+        // 触发serverSocket的IO异常，已停止线程
         try {
-            userCanceled = true;
+            HBLog.i(TAG, "[AcceptThread-" + name + "] Close server socket");
             serverSocket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            HBLog.e(TAG, "[AcceptThread-" + name + "] Close server socket failed: "
+                    + e.getMessage());
+        }
+    }
+
+    private void release() {
+        if (serverSocket != null) {
+            HBLog.i(TAG, "[AcceptThread-" + name + "] Close server socket");
+            try {
+                serverSocket.close();
+                serverSocket = null;
+            } catch (IOException e) {
+                HBLog.e(TAG, "[AcceptThread-" + name + "] Close server socket failed: "
+                        + e.getMessage());
+            }
         }
     }
 }

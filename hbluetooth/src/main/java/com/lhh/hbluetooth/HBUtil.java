@@ -22,39 +22,39 @@ public class HBUtil {
         void onError(int code);
     }
 
-    private ServiceConnection mConnection = new ServiceConnection() {
+    private ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            mBinder = (HBService.HBBinder)service;
-            mCallback.onSuccess();
+            HBLog.i(TAG, "HBService connected");
+            binder = (HBService.HBBinder)service;
+            callback.onSuccess();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-
+            HBLog.i(TAG, "HBService disconnected");
         }
     };
 
-    private volatile static HBUtil sInstance;
+    private static final String TAG = "HBUtil";
 
-    private BluetoothAdapter mAdapter;
+    private volatile static HBUtil instance;
 
-    private HBService.HBBinder mBinder;
+    private BluetoothAdapter adapter;
 
-    private HBInitCallback mCallback;
+    private HBService.HBBinder binder;
+
+    private HBInitCallback callback;
 
     public static HBUtil getInstance() {
-        if (sInstance == null) {
+        if (instance == null) {
             synchronized (HBUtil.class) {
-                if (sInstance == null) {
-                    sInstance = new HBUtil();
+                if (instance == null) {
+                    instance = new HBUtil();
                 }
             }
         }
-        return sInstance;
-    }
-
-    public HBUtil() {
+        return instance;
     }
 
     public static void initialize(Context context) {
@@ -65,13 +65,15 @@ public class HBUtil {
      * 初始化工作，获取设备的蓝牙适配器
      */
     public void init(HBInitCallback callback) {
-        mCallback = callback;
+        HBLog.i(TAG, "Init");
+        this.callback = callback;
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
+            HBLog.w(TAG, "Get default bluetooth adapter failed");
             callback.onError(HBConstant.ERROR_CODE_BLUETOOTH_ADAPTER_UNAVAILABLE);
             return;
         }
-        mAdapter = adapter;
+        this.adapter = adapter;
         startService();
     }
 
@@ -79,17 +81,19 @@ public class HBUtil {
      * 开启并绑定蓝牙服务
      */
     private void startService() {
+        HBLog.i(TAG, "Start HBService");
         Intent intent = new Intent(HBApplication.getContext(), HBService.class);
         HBApplication.getContext().startService(intent);
-        HBApplication.getContext().bindService(intent, mConnection, Context.BIND_AUTO_CREATE);
+        HBApplication.getContext().bindService(intent, connection, Context.BIND_AUTO_CREATE);
     }
 
     /**
      * 解绑并停止蓝牙服务
      */
     private void stopService() {
+        HBLog.i(TAG, "Stop HBService");
         Intent intent = new Intent(HBApplication.getContext(), HBService.class);
-        HBApplication.getContext().unbindService(mConnection);
+        HBApplication.getContext().unbindService(connection);
         HBApplication.getContext().stopService(intent);
     }
 
@@ -98,7 +102,7 @@ public class HBUtil {
      * @return 蓝牙适配器
      */
     public BluetoothAdapter getAdapter() {
-        return mAdapter;
+        return adapter;
     }
 
     /**
@@ -106,10 +110,10 @@ public class HBUtil {
      * @return 是否启用
      */
     public boolean isAdapterEnabled() {
-        if (mAdapter == null) {
+        if (adapter == null) {
             return false;
         }
-        return mAdapter.isEnabled();
+        return adapter.isEnabled();
     }
 
     /**
@@ -117,6 +121,8 @@ public class HBUtil {
      * @param activity 活动
      */
     public void requestEnableAdapter(Activity activity) {
+        HBLog.d(TAG, "Request enable bluetooth adapter from "
+                + activity.getClass().getSimpleName());
         Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
         activity.startActivityForResult(intent, HBConstant.REQ_CODE_ACTION_REQUEST_ENABLE);
     }
@@ -127,6 +133,8 @@ public class HBUtil {
      * @param duration 可见时间
      */
     public void requestDiscoverable(Activity activity, int duration) {
+        HBLog.d(TAG, "Request discoverable: " + duration + " from "
+                + activity.getClass().getSimpleName());
         Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, duration);
         activity.startActivityForResult(intent, HBConstant.REQ_CODE_ACTION_REQUEST_DISCOVERABLE);
@@ -136,11 +144,13 @@ public class HBUtil {
      * 开始搜索蓝牙设备
      */
     public boolean startDiscovery() {
-        if (mAdapter == null) {
+        HBLog.d(TAG, "Start discovery device");
+        if (adapter == null) {
+            HBLog.w(TAG, "Bluetooth adapter not found");
             return false;
         }
-        if (!mAdapter.isDiscovering()) {
-            return mAdapter.startDiscovery();
+        if (!adapter.isDiscovering()) {
+            return adapter.startDiscovery();
         }
         return true;
     }
@@ -149,11 +159,13 @@ public class HBUtil {
      * 停止搜索蓝牙设备
      */
     public boolean cancelDiscovery() {
-        if (mAdapter == null) {
+        HBLog.d(TAG, "Cancel discovery device");
+        if (adapter == null) {
+            HBLog.w(TAG, "Bluetooth adapter not found");
             return false;
         }
-        if (mAdapter.isDiscovering()) {
-            return mAdapter.cancelDiscovery();
+        if (adapter.isDiscovering()) {
+            return adapter.cancelDiscovery();
         }
         return true;
     }
@@ -165,14 +177,14 @@ public class HBUtil {
      * @param callback 连接的回调
      */
     public void startAccept(String name, UUID uuid, HBAcceptThread.AcceptCallback callback) {
-        mBinder.startAccpet(mAdapter, name, uuid, callback);
+        binder.startAccpet(adapter, name, uuid, callback);
     }
 
     /**
      * 停止接受蓝牙设备的连接
      */
-    public boolean cancelAccept() {
-        return mBinder.cancelAccept();
+    public void cancelAccept() {
+        binder.cancelAccept();
     }
 
     /**
@@ -182,11 +194,13 @@ public class HBUtil {
      * @param callback 连接的回调
      */
     public void connectDevice(String address, UUID uuid, HBConnectThread.HBConnectCallback callback) {
-        if (mBinder == null) {
+        if (binder == null) {
+            HBLog.w(TAG, "Bluetooth adapter not found");
             callback.onError(HBConstant.ERROR_CODE_SERVICE_NOT_START);
             return;
         }
-        if (mBinder.isConnectionExist(address)) {
+        if (binder.isConnectionExist(address)) {
+            HBLog.w(TAG, "Connection already exist: " + address);
             callback.onError(HBConstant.ERROR_CODE_DEVICE_ALREADY_CONNECTED);
             return;
         }
@@ -196,23 +210,26 @@ public class HBUtil {
 
         BluetoothDevice device;
         try {
-            device = mAdapter.getRemoteDevice(address);
+            device = adapter.getRemoteDevice(address);
         } catch (IllegalArgumentException e) {
+            HBLog.e(TAG, "Get remote device failed: " + e.getMessage());
             callback.onError(HBConstant.ERROR_CODE_INVALID_DEVICE_ADDRESS);
             return;
         }
 
-        mBinder.connectDevice(device, uuid, callback);
+        binder.connectDevice(device, uuid, callback);
     }
 
     /**
      * 根据目标设备地址断开与其的连接
      * @param address 目标设备蓝牙地址
-     * @return true：成功与目标断开连接；false：未与目标设备连接
      */
-    public boolean disconnectDevice(String address) {
-        if (mBinder == null) return false;
-        return mBinder.disconnectDevice(address);
+    public void disconnectDevice(String address) {
+        if (binder != null) {
+            binder.disconnectDevice(address);
+        } else {
+            HBLog.w(TAG, "HBService not start");
+        }
     }
 
     /**
@@ -221,8 +238,8 @@ public class HBUtil {
      * @return 蓝牙连接对象
      */
     public HBConnection getConnection(String address) {
-        if (mBinder == null) return null;
-        return mBinder.getConnection(address);
+        if (binder == null) return null;
+        return binder.getConnection(address);
     }
 
     /**
@@ -230,8 +247,8 @@ public class HBUtil {
      * @return 连接对象列表
      */
     public java.util.List<HBConnection> getAllConnection() {
-        if (mBinder == null) return null;
-        return mBinder.getAllConnection();
+        if (binder == null) return null;
+        return binder.getAllConnection();
     }
 
     /**
@@ -239,7 +256,15 @@ public class HBUtil {
      * @param key 注册名
      */
     public void unregisterAll(String key) {
-        mBinder.unregisterAll(key);
+        binder.unregisterAll(key);
+    }
+
+    /**
+     * 设置日志等级
+     * @param level 日志等级
+     */
+    public void setLogLevel(int level) {
+        HBLog.setLogLevel(level);
     }
 
     /**

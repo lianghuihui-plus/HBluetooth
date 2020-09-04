@@ -167,11 +167,8 @@ public class MainActivity extends BaseActivity {
 
     @OnClick(R.id.cancel_accept) void cancelAccept() {
         if (HBUtil.getInstance().isAdapterEnabled()) {
-            if (HBUtil.getInstance().cancelAccept()) {
-                showToast("Cancel Accept Success.");
-            } else {
-                showToast("Cancel Accept Failed! You May Not Have Started The Task!");
-            }
+            showToast("Cancel Accept.");
+            HBUtil.getInstance().cancelAccept();
         } else {
             showToast("Bluetooth Adapter Is Disabled!");
         }

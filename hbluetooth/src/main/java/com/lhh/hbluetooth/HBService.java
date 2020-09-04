@@ -1,5 +1,6 @@
 package com.lhh.hbluetooth;
 
+import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -11,12 +12,13 @@ import android.os.IBinder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * 蓝牙服务类
  */
-public class HBService extends android.app.Service {
+public class HBService extends Service {
 
     public class HBBinder extends Binder {
         public void startAccpet(BluetoothAdapter adapter, String name, UUID uuid,
@@ -24,8 +26,8 @@ public class HBService extends android.app.Service {
             HBService.this.startAccept(adapter, name, uuid, callback);
         }
 
-        public boolean cancelAccept() {
-            return HBService.this.cancelAccept();
+        public void cancelAccept() {
+            HBService.this.cancelAccept();
         }
 
         public void connectDevice(BluetoothDevice device, UUID uuid,
@@ -33,15 +35,15 @@ public class HBService extends android.app.Service {
             HBService.this.connectDevice(device, uuid, callback);
         }
 
-        public boolean disconnectDevice(String address) {
-            return HBService.this.disconnectDevice(address);
+        public void disconnectDevice(String address) {
+            HBService.this.disconnectDevice(address);
         }
 
         public HBConnection getConnection(String address) {
             return HBService.this.getConnection(address);
         }
 
-        public java.util.List<HBConnection> getAllConnection() {
+        public List<HBConnection> getAllConnection() {
             return HBService.this.getAllConnection();
         }
 
@@ -54,7 +56,7 @@ public class HBService extends android.app.Service {
         }
     }
 
-    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -76,11 +78,13 @@ public class HBService extends android.app.Service {
         }
     };
 
-    private HBBinder mBinder = new HBBinder();
+    private static final String TAG = "HBService";
 
-    private HBAcceptThread mAcceptThread;
+    private HBBinder binder = new HBBinder();
 
-    private HashMap<String, HBConnection> mConnectionHashMap = new HashMap<>();
+    private HBAcceptThread acceptThread;
+
+    private HashMap<String, HBConnection> connectionHashMap = new HashMap<>();
 
     @Override
     public void onCreate() {
@@ -96,14 +100,14 @@ public class HBService extends android.app.Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return mBinder;
+        return binder;
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
 
-        unregisterReceiver(mBroadcastReceiver);
+        unregisterReceiver(broadcastReceiver);
 
         cancelAccept();
 
@@ -114,7 +118,7 @@ public class HBService extends android.app.Service {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         intentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        registerReceiver(mBroadcastReceiver, intentFilter);
+        registerReceiver(broadcastReceiver, intentFilter);
     }
 
     /**
@@ -126,8 +130,8 @@ public class HBService extends android.app.Service {
      */
     public void startAccept(BluetoothAdapter adapter, String name, UUID uuid, HBAcceptThread.AcceptCallback callback) {
         cancelAccept();
-
-        mAcceptThread = new HBAcceptThread(adapter, name, uuid, new HBAcceptThread.AcceptCallback() {
+        HBLog.i(TAG, "Start accept device");
+        acceptThread = new HBAcceptThread(adapter, name, uuid, new HBAcceptThread.AcceptCallback() {
             @Override
             public void onClientConnected(HBConnection connection) {
                 addConnection(connection);
@@ -139,20 +143,18 @@ public class HBService extends android.app.Service {
                 callback.onFailed(code);
             }
         });
-        mAcceptThread.start();
+        acceptThread.start();
     }
 
     /**
      * 停止接受蓝牙设备的连接
      */
-    public boolean cancelAccept() {
-        boolean isSuccess = false;
-        if (mAcceptThread != null) {
-            mAcceptThread.cancel();
-            mAcceptThread = null;
-            isSuccess = true;
+    public void cancelAccept() {
+        HBLog.i(TAG, "Cancel accept device");
+        if (acceptThread != null) {
+            acceptThread.cancel();
+            acceptThread = null;
         }
-        return isSuccess;
     }
 
     /**
@@ -180,35 +182,40 @@ public class HBService extends android.app.Service {
     /**
      * 根据目标设备地址断开与其的连接
      * @param address 目标设备蓝牙地址
-     * @return true：成功与目标断开连接；false：未与目标设备连接
      */
-    public boolean disconnectDevice(String address) {
-        if (!mConnectionHashMap.containsKey(address)) {
-            return false;
+    public void disconnectDevice(String address) {
+        HBLog.i(TAG, "Disconnect device: " + address);
+        if (!isConnectionExist(address)) {
+            HBLog.i(TAG, "Device not connected: " + address);
+            return;
         }
         removeConnection(address);
-        return true;
     }
 
     /**
      * 与所有已连接设备断开连接
      */
     public void disconnectAllDevice() {
-        for (HBConnection connection: mConnectionHashMap.values()) {
+        HBLog.i(TAG, "Disconnect from all devices");
+        for (HBConnection connection: connectionHashMap.values()) {
             connection.die();
         }
-        mConnectionHashMap.clear();
+        connectionHashMap.clear();
+        connectionHashMap = null;
     }
 
     /**
-     * 将蓝牙连接对象保存到Hash中，若相同设备的连接已存在，则销毁当前连接
+     * 将蓝牙连接对象保存到Hash中，若相同设备的连接已存在，则覆盖连接
      * @param connection 蓝牙连接对象
      */
     private void addConnection(HBConnection connection) {
-        if (!mConnectionHashMap.containsKey(connection.getDevcieAddress())) {
-            mConnectionHashMap.put(connection.getDevcieAddress(), connection);
+        HBLog.i(TAG, "Add connection: " + connection.getDeviceName());
+        if (!isConnectionExist(connection.getDevcieAddress())) {
+            connectionHashMap.put(connection.getDevcieAddress(), connection);
         } else {
-            connection.die();
+            HBLog.w(TAG, "Connection is already exist");
+            disconnectDevice(connection.getDevcieAddress());
+            addConnection(connection);
         }
     }
 
@@ -217,9 +224,9 @@ public class HBService extends android.app.Service {
      * @param key 蓝牙地址
      */
     private void removeConnection(String key) {
-        if (mConnectionHashMap.containsKey(key)) {
-            mConnectionHashMap.get(key).die();
-            mConnectionHashMap.remove(key);
+        if (isConnectionExist(key)) {
+            connectionHashMap.get(key).die();
+            connectionHashMap.remove(key);
         }
     }
 
@@ -229,14 +236,14 @@ public class HBService extends android.app.Service {
      * @return 蓝牙连接对象
      */
     public HBConnection getConnection(String address) {
-        if (mConnectionHashMap.containsKey(address)) {
-            return mConnectionHashMap.get(address);
+        if (isConnectionExist(address)) {
+            return connectionHashMap.get(address);
         }
         return null;
     }
 
-    public java.util.List<HBConnection> getAllConnection() {
-        return new ArrayList<>(mConnectionHashMap.values());
+    public List<HBConnection> getAllConnection() {
+        return new ArrayList<>(connectionHashMap.values());
     }
 
     /**
@@ -244,7 +251,8 @@ public class HBService extends android.app.Service {
      * @param key 注册名
      */
     public void unregisterAll(String key) {
-        for (HBConnection connection: mConnectionHashMap.values()) {
+        HBLog.i(TAG, "Unregister all listener of " + key);
+        for (HBConnection connection: connectionHashMap.values()) {
             connection.unregisterListener(key);
         }
     }
@@ -255,6 +263,6 @@ public class HBService extends android.app.Service {
      * @return 是否已建立连接
      */
     public boolean isConnectionExist(String address) {
-        return mConnectionHashMap.containsKey(address);
+        return connectionHashMap.containsKey(address);
     }
 }
