@@ -14,7 +14,7 @@ Android蓝牙工具，可以更便捷的操作蓝牙
   
   ```sh
   dependencies {
-        implementation 'com.github.lianghuihui-plus:HBluetooth:v1.0.2'
+        implementation 'com.github.lianghuihui-plus:HBluetooth:v1.0.3'
   }
   ```
 ### 2.配置HBApplication
@@ -257,5 +257,5 @@ Android蓝牙工具，可以更便捷的操作蓝牙
 ```sh
   connection.write(bytes);
 ```
-### 6.发现问题
+## 发现问题
 如果您在使用过程中发现任何问题，可以留言，或者发送邮件到我的邮箱979180936@qq.com
