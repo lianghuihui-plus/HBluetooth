@@ -8,59 +8,53 @@
     tools:context=".MainActivity">
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/device_list_view"
+        android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_weight="1"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"/>
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="2">
+        android:layout_height="wrap_content">
 
         <Button
-            android:id="@+id/open_bluetooth_button"
+            android:id="@+id/btn_enabled_adapter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="open bluetooth"/>
-
+            android:text="打开蓝牙"/>
         <Button
-            android:id="@+id/close_bluetooth_button"
+            android:id="@+id/btn_disabled_adapter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="close bluetooth"/>
-
+            android:text="关闭蓝牙"/>
         <Button
-            android:id="@+id/discoverable_button"
+            android:id="@+id/btn_start_discovery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="discoverable"/>
-
+            android:text="开始扫描"/>
         <Button
-            android:id="@+id/start_discovery_button"
+            android:id="@+id/btn_cancel_discovery"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="start discovery"/>
-
+            android:text="停止扫描"/>
         <Button
-            android:id="@+id/cancel_discovery_button"
+            android:id="@+id/btn_discoverable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="cancel discovery"/>
-
+            android:text="蓝牙可见"/>
         <Button
-            android:id="@+id/start_accept"
+            android:id="@+id/btn_start_accept"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="start accept"/>
-
+            android:text="开始等待连接"/>
         <Button
-            android:id="@+id/cancel_accept"
+            android:id="@+id/btn_cancel_accept"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="cancel accept"/>
-
+            android:text="停止等待连接"/>
     </LinearLayout>
 
 </LinearLayout>

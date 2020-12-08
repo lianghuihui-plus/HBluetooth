@@ -3,49 +3,45 @@ package com.lhh.hbluetooth;
 import android.bluetooth.BluetoothSocket;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 
+/**
+ * 蓝牙读线程
+ * 唯一观察者为创建该实例的{@link HBConnection}对象
+ * 并且该类的实例应该只由{@link HBConnection}对象进行创建
+ */
 public class HBReadThread extends Thread {
 
     private static final String TAG = "HBReadThread";
 
-    private String deviceName;
-
-    private java.io.InputStream inputStream;
-
+    private String tag;
     private HBReadListener listener;
+    private InputStream inputStream;
 
-    private volatile boolean exit = false;
-
-    public HBReadThread(String deviceName, BluetoothSocket socket, HBReadListener listener) {
-        HBLog.i(TAG, "[ReadThread-" + deviceName + "] Read thread create");
-        this.deviceName = deviceName;
+    public HBReadThread(String tag, BluetoothSocket socket, HBReadListener listener) {
+        this.tag = tag;
         this.listener = listener;
-
         try {
-            this.inputStream = socket.getInputStream();
+            inputStream = socket.getInputStream();
         } catch (IOException e) {
-            HBLog.e(TAG, "[ReadThread-" + deviceName + "] Get input stream failed: "
-                    + e.getMessage());
+            HBLog.e(TAG, "[ReadThread-"+tag+"] Get input stream error: " + e.getMessage());
         }
+        HBLog.d(TAG, "[ReadThread-"+tag+"] Created");
     }
 
     @Override
     public void run() {
         super.run();
-        byte[] readBuffer = new byte[5120];
+        if (inputStream == null) return;
+        byte[] readBuffer = new byte[10240];
         byte[] buffer;
         int bufferLen;
-        while (!exit) {
+        while (!isInterrupted()) {
             try {
                 bufferLen = inputStream.read(readBuffer);
-                HBLog.d(TAG, "[ReadThread-" + deviceName + "] Read buffer len: " + bufferLen);
             } catch (IOException e) {
-                if (!exit) {
-                    HBLog.e(TAG, "[ReadThread-" + deviceName + "] Read buffer error: "
-                            + e.getMessage());
-                    listener.onError(HBConstant.ERROR_CODE_READ_FAILED);
-                }
+                HBLog.e(TAG, "[ReadThread-"+tag+"] Read buffer error: " + e.getMessage());
                 break;
             }
             if (bufferLen > 0) {
@@ -56,18 +52,17 @@ public class HBReadThread extends Thread {
         release();
     }
 
-    public void cancel() {
-        HBLog.i(TAG, "[ReadThread-" + deviceName + "] Cancel");
-        exit = true;
-    }
-
     private void release() {
-        try {
-            HBLog.i(TAG, "[ReadThread-" + deviceName + "] Close input stream");
-            inputStream.close();
-        } catch (IOException e) {
-            HBLog.e(TAG, "[ReadThread-" + deviceName + "] Close input stream failed: "
-                    + e.getMessage());
+        if (inputStream != null) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            inputStream = null;
+            HBLog.d(TAG, "[ReadThread-"+tag +"] InputStream is closed");
         }
+
+        listener = null;
     }
 }

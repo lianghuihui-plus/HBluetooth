@@ -2,9 +2,7 @@ package com.lhh.hbluetooth;
 
 public interface HBConnectionListener {
 
+    void onRead(byte[] bytes);
     void onDisconnected(String address);
-
-    void onRead(byte[] cache);
-
-    void onError(int code);
+    void onError(Exception e);
 }

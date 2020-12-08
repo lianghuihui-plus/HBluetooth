@@ -5,11 +5,4 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
 
-    <application>
-        <service
-            android:name=".HBService"
-            android:enabled="true"
-            android:exported="true"></service>
-    </application>
-
 </manifest>

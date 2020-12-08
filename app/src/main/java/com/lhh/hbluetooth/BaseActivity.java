@@ -9,58 +9,44 @@ import androidx.core.content.ContextCompat;
 
 public abstract class BaseActivity extends AppCompatActivity {
 
-    /**
-     * 权限检查
-     *
-     * @param neededPermissions 需要的权限
-     * @return 是否全部被允许
-     */
+    protected void showToast(String text) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getBaseContext(), text, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    protected void showLongToast(String text) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(getBaseContext(), text, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
     protected boolean checkPermissions(String[] neededPermissions) {
-        if (neededPermissions == null || neededPermissions.length == 0) {
-            return true;
-        }
         boolean allGranted = true;
-        for (String neededPermission : neededPermissions) {
-            allGranted &= ContextCompat.checkSelfPermission(this, neededPermission) == PackageManager.PERMISSION_GRANTED;
-        }
+        for (String permission: neededPermissions)
+            allGranted &= (ContextCompat.checkSelfPermission(getBaseContext(), permission)
+                    == PackageManager.PERMISSION_GRANTED);
         return allGranted;
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        boolean isAllGranted = true;
-        for (int grantResult : grantResults) {
-            isAllGranted &= (grantResult == PackageManager.PERMISSION_GRANTED);
-        }
-        afterRequestPermission(requestCode, isAllGranted);
-    }
-
-    /**
-     * 请求权限的回调
-     *
-     * @param requestCode  请求码
-     * @param isAllGranted 是否全部被同意
-     */
-    protected abstract void afterRequestPermission(int requestCode, boolean isAllGranted);
-
-    protected void showToast(String msg) {
-        runOnUiThread(() -> Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show());
-    }
-
-    protected void showLongToast(String msg) {
-        runOnUiThread(() -> Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show());
-    }
-
-    protected void delayFinish(final long delayTime) {
-        new Thread(() -> {
-            try {
-                Thread.sleep(delayTime);
-            } catch (InterruptedException e) {
-                showToast(e.getMessage());
-            } finally {
-                runOnUiThread(this::finish);
+        boolean allGranted = true;
+        for (int grantResult: grantResults) {
+            if (grantResult != PackageManager.PERMISSION_GRANTED) {
+                allGranted = false;
+                break;
             }
-        }).start();
+        }
+        afterRequestPermission(requestCode, allGranted);
     }
+
+    protected void afterRequestPermission(int requestCode, boolean allGranted) {}
 }

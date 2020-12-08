@@ -1,345 +1,323 @@
 package com.lhh.hbluetooth;
 
-import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import butterknife.OnClick;
-
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public class MainActivity extends BaseActivity {
+import butterknife.BindView;
+import butterknife.ButterKnife;
 
-    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action == null) return;
-            Log.d(TAG, "onReceive: " + action);
-            switch (action) {
-                case BluetoothAdapter.ACTION_STATE_CHANGED:
-                    int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
-                            BluetoothAdapter.ERROR);
-                    if (state == BluetoothAdapter.STATE_ON) {
-                        showToast("Bluetooth Adapter Is On.");
-                    } else if (state == BluetoothAdapter.STATE_OFF) {
-                        showToast("Bluetooth Adapter Is Off.");
-                        mDeviceList.clear();
-                        runOnUiThread(() -> mDeviceAdapter.notifyDataSetChanged());
-                    } else if (state == BluetoothAdapter.ERROR) {
-                        showToast("Bluetooth Adapter Error!");
-                    }
-                    break;
-                case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
-                    showToast("Start Discovery Device.");
-                    break;
-                case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
-                    showToast("Canceled Discovery Device.");
-                    break;
-                case BluetoothDevice.ACTION_FOUND:
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (device == null || device.getName() == null || device.getName().isEmpty()) return;
-                    Log.d(TAG, "onReceive: ACTION_FOUND: " + device.getName());
-                    BlueDevice blueDevice = new BlueDevice(device.getName(), device.getAddress());
-                    if (!listContains(blueDevice)) {
-                        mDeviceList.add(blueDevice);
-                        mDeviceAdapter.notifyItemInserted(mDeviceList.size()-1);
-                    }
-                    break;
-            }
-        }
-    };
+public class MainActivity extends BaseActivity implements View.OnClickListener {
 
     private static final String TAG = "MainActivity";
 
-    @OnClick(R.id.open_bluetooth_button) void openBluetooth() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            showToast("Bluetooth Adapter Is Alreay Enabled.");
-        } else {
-            HBUtil.getInstance().requestEnableAdapter(this);
-        }
-    }
+    public static final String SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
+    private static final int REQUEST_BLUETOOTH_ADAPTER_ENABLE = 0x0101;
+    private static final int REQUEST_BLUETOOTH_ADAPTER_DISCOVERABLE = 0x0102;
+    private static final int REQUEST_NEEDED_PERMISSIONS = 0x0103;
+    private static final String[] NEEDED_PERMISSIONS = {
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
+    };
 
-    @OnClick(R.id.close_bluetooth_button) void closeBluetooth() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            HBUtil.getInstance().getAdapter().disable();
-        } else {
-            showToast("Bluetooth Adapter Is Already Disabled.");
-        }
-    }
+    @BindView(R.id.recycler_view)
+    public RecyclerView recyclerView;
+    @BindView(R.id.btn_enabled_adapter)
+    public Button enabledAdapterButton;
+    @BindView(R.id.btn_disabled_adapter)
+    public Button disabledAdapterButton;
+    @BindView(R.id.btn_start_discovery)
+    public Button startDiscoveryButton;
+    @BindView(R.id.btn_cancel_discovery)
+    public Button cancelDiscoveryButton;
+    @BindView(R.id.btn_discoverable)
+    public Button discoverableButton;
+    @BindView(R.id.btn_start_accept)
+    public Button startAcceptButton;
+    @BindView(R.id.btn_cancel_accept)
+    public Button cancelAcceptButton;
 
-    @OnClick(R.id.discoverable_button) void discoverable() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            HBUtil.getInstance().requestDiscoverable(this, 150);
-        } else {
-            showToast("Bluetooth Adapter Is Disabled!");
-        }
-    }
-
-    @OnClick(R.id.start_discovery_button) void startDiscovery() {
-
-        String[] neededPermissions = new String[] {
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        };
-        if (!checkPermissions(neededPermissions)) {
-            requestPermissions(neededPermissions, 0);
-        } else {
-            if (HBUtil.getInstance().isAdapterEnabled()) {
-                if (!HBUtil.getInstance().startDiscovery()) {
-                    showToast("Start Discovery Failed!");
-                }
-            } else {
-                showToast("Bluetooth Adapter Is Disabled!");
-            }
-        }
-    }
-
-    @OnClick(R.id.cancel_discovery_button) void cancelDiscovery() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            if (!HBUtil.getInstance().cancelDiscovery()) {
-                showToast("Cancel Discovery Failed!");
-            }
-        } else {
-            showToast("Bluetooth Adapter Is Disabled!");
-        }
-    }
-
-    @OnClick(R.id.start_accept) void startAccept() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            HBUtil.getInstance().startAccept("server", UUID.fromString(Constant.SPP_UUID),
-                    new HBAcceptThread.AcceptCallback() {
-                @Override
-                public void onClientConnected(HBConnection connection) {
-                    showToast("Device Connected: " + connection.getDeviceName());
-                    connection.startRead();
-                    connection.registerListener(MainActivity.class.getName(), new HBConnectionListener() {
-                        @Override
-                        public void onDisconnected(String address) {
-                            refreshDeviceState(address, BlueDeviceStatus.DISCONNECTED);
-                        }
-
-                        @Override
-                        public void onRead(byte[] cache) {
-
-                        }
-
-                        @Override
-                        public void onError(int code) {
-
-                        }
-                    });
-                    if (listContains(connection.getDevcieAddress())) {
-                        refreshDeviceState(connection.getDevcieAddress(), BlueDeviceStatus.CONNECTED);
-                    } else {
-                        BlueDevice newDevice = new BlueDevice(connection.getDeviceName(),
-                                connection.getDevcieAddress());
-                        newDevice.setStatus(BlueDeviceStatus.CONNECTED);
-                        mDeviceList.add(newDevice);
-                        runOnUiThread(() -> mDeviceAdapter.notifyDataSetChanged());
-                    }
-                }
-
-                @Override
-                public void onFailed(int code) {
-                    showToast("Accept Error With Code: " + code);
-                }
-            });
-            showToast("Start Accept Client.");
-        } else {
-            showToast("Bluetooth Adapter Is Disabled!");
-        }
-    }
-
-    @OnClick(R.id.cancel_accept) void cancelAccept() {
-        if (HBUtil.getInstance().isAdapterEnabled()) {
-            showToast("Cancel Accept.");
-            HBUtil.getInstance().cancelAccept();
-        } else {
-            showToast("Bluetooth Adapter Is Disabled!");
-        }
-    }
-
-    @BindView(R.id.device_list_view)
-    protected RecyclerView mDeviceListView;
-
-    private BluetoothDeviceAdapter mDeviceAdapter;
-
-    private List<BlueDevice> mDeviceList = new ArrayList<>();
+    private BluetoothDeviceAdapter adapter;
+    private List<MyBluetoothDevice> deviceList = new ArrayList<>();
+    private BluetoothAdapter bluetoothAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         ButterKnife.bind(this);
+        HBUtil.setLogLevel(HBUtil.HLogLevel.D);
 
         initView();
-
         registerReceiver();
 
-        HBUtil.getInstance().init(new HBUtil.HBInitCallback() {
-            @Override
-            public void onSuccess() {
+        checkPermissions();
 
-            }
-
-            @Override
-            public void onError(int code) {
-                delayFinish(3000);
-            }
-        });
+        BluetoothManager manager = (BluetoothManager)getSystemService(Context.BLUETOOTH_SERVICE);
+        bluetoothAdapter = manager.getAdapter();
+        if (bluetoothAdapter == null) {
+            showLongToast("Device not support bluetooth!");
+            finish();
+        } else if (!bluetoothAdapter.isEnabled()) {
+            Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(intent, REQUEST_BLUETOOTH_ADAPTER_ENABLE);
+        }
     }
 
     @Override
     protected void onDestroy() {
+        unregisterReceiver();
         super.onDestroy();
+    }
 
-        unregisterReceiver(mBroadcastReceiver);
-
-        HBUtil.getInstance().release();
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.btn_enabled_adapter:
+                if (!bluetoothAdapter.isEnabled()) {
+                    Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                    startActivityForResult(intent, REQUEST_BLUETOOTH_ADAPTER_ENABLE);
+                } else {
+                    showToast("蓝牙已是打开状态！");
+                }
+                break;
+            case R.id.btn_disabled_adapter:
+                if (bluetoothAdapter.isEnabled()) {
+                    bluetoothAdapter.disable();
+                    showToast("蓝牙已关闭");
+                } else {
+                    showToast("蓝牙已是关闭状态！");
+                }
+                break;
+            case R.id.btn_start_discovery:
+                if (!bluetoothAdapter.isDiscovering()) {
+                    bluetoothAdapter.startDiscovery();
+                    showToast("开始扫描设备");
+                } else {
+                    showToast("蓝牙正在扫描设备，请勿重复操作！");
+                }
+                break;
+            case R.id.btn_cancel_discovery:
+                if (bluetoothAdapter.isDiscovering()) {
+                    bluetoothAdapter.cancelDiscovery();
+                    showToast("停止扫描设备");
+                } else {
+                    showToast("蓝牙未开始扫描设备！");
+                }
+                break;
+            case R.id.btn_discoverable:
+                Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+                intent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 0);
+                startActivityForResult(intent, REQUEST_BLUETOOTH_ADAPTER_DISCOVERABLE);
+                break;
+            case R.id.btn_start_accept:
+                HBluetooth.getInstance().startAccept(
+                        bluetoothAdapter,
+                        "serverName",
+                        UUID.fromString(SPP_UUID),
+                        acceptListener
+                );
+                showToast("开始等待设备连接");
+                break;
+            case R.id.btn_cancel_accept:
+                HBluetooth.getInstance().cancelAccept();
+                showToast("停止接收设备连接");
+                break;
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        Log.d(TAG, "onActivityResult: requestCode: " + requestCode);
-        Log.d(TAG, "onActivityResult: resultCode: " + resultCode);
-        switch (requestCode) {
-            case HBConstant.REQ_CODE_ACTION_REQUEST_ENABLE:
-                if (resultCode != RESULT_OK) {
-                    showToast("You Refuse Permission!");
-                }
-                break;
-            case HBConstant.REQ_CODE_ACTION_REQUEST_DISCOVERABLE:
-                if (resultCode == RESULT_CANCELED) {
-                    showToast("You Refuse Permission!");
-                } else {
-                    showToast("You Device Will Be Discoverable In " + resultCode + " Seconds.");
-                }
-                break;
-        }
-    }
-
-    @Override
-    protected void afterRequestPermission(int requestCode, boolean isAllGranted) {
-        if (requestCode == 0) {
-            if (isAllGranted) {
-                startDiscovery();
+        if (requestCode == REQUEST_BLUETOOTH_ADAPTER_ENABLE) {
+            if (resultCode != RESULT_OK)  {
+                showToast("请求打开蓝牙被拒绝！");
+            }
+        } else if (requestCode == REQUEST_BLUETOOTH_ADAPTER_DISCOVERABLE) {
+            if (resultCode == RESULT_CANCELED) {
+                showToast("请求蓝牙可被发现被拒绝！");
+            } else {
+                showToast("蓝牙设备在" + resultCode + "秒内可见");
             }
         }
     }
 
+    @Override
+    protected void afterRequestPermission(int requestCode, boolean allGranted) {
+        super.afterRequestPermission(requestCode, allGranted);
+        if (requestCode == REQUEST_NEEDED_PERMISSIONS) {
+            if (!allGranted) {
+                showToast("申请权限被拒绝！");
+                finish();
+            }
+        }
+    }
+
+    private void checkPermissions() {
+        if (!checkPermissions(NEEDED_PERMISSIONS)) {
+            ActivityCompat.requestPermissions(this, NEEDED_PERMISSIONS, REQUEST_NEEDED_PERMISSIONS);
+        }
+    }
+
     private void initView() {
-        LinearLayoutManager manager = new LinearLayoutManager(this);
-        mDeviceListView.setLayoutManager(manager);
+        adapter = new BluetoothDeviceAdapter(deviceList, onDeviceItemClickListener);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setItemAnimator(new DefaultItemAnimator());
+        recyclerView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
+        recyclerView.setAdapter(adapter);
 
-        mDeviceAdapter = new BluetoothDeviceAdapter(mDeviceList, device -> {
-            Log.d(TAG, "onClick: device name: " + device.getName());
+        enabledAdapterButton.setOnClickListener(this);
+        disabledAdapterButton.setOnClickListener(this);
+        startDiscoveryButton.setOnClickListener(this);
+        cancelDiscoveryButton.setOnClickListener(this);
+        discoverableButton.setOnClickListener(this);
+        startAcceptButton.setOnClickListener(this);
+        cancelAcceptButton.setOnClickListener(this);
+    }
 
-            if (device.getStatus() == BlueDeviceStatus.DISCONNECTED) {
-                refreshDeviceState(device.getAddress(), BlueDeviceStatus.CONNECTING);
-                HBUtil.getInstance().connectDevice(
-                        device.getAddress(),
-                        UUID.fromString(Constant.SPP_UUID),
-                        new HBConnectThread.HBConnectCallback() {
+    private void registerReceiver() {
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
+        registerReceiver(receiver, intentFilter);
+    }
+
+    private void unregisterReceiver() {
+        unregisterReceiver(receiver);
+    }
+
+    private boolean isDeviceExist(BluetoothDevice device) {
+        for (MyBluetoothDevice myDevice : deviceList) {
+            if (myDevice.getDevice().getAddress().equals(device.getAddress())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private BluetoothDeviceAdapter.OnDeviceItemClickListener onDeviceItemClickListener = new BluetoothDeviceAdapter.OnDeviceItemClickListener() {
+        @Override
+        public void onClick(MyBluetoothDevice device) {
+            if (device.getStatus() == MyBluetoothDevice.BluetoothDeviceStatus.Connected) {
+                HBConnection connection = HBluetooth.getInstance().getConnection(device.getDevice().getAddress());
+                if (connection != null) {
+                    connection.disconnect();
+                    device.setStatus(MyBluetoothDevice.BluetoothDeviceStatus.Disconnect);
+                    adapter.notifyDataSetChanged();
+                }
+            } else if (device.getStatus() == MyBluetoothDevice.BluetoothDeviceStatus.Disconnect) {
+                if (bluetoothAdapter.isDiscovering()) {
+                    bluetoothAdapter.cancelDiscovery();
+                }
+                device.setStatus(MyBluetoothDevice.BluetoothDeviceStatus.Connecting);
+                adapter.notifyDataSetChanged();
+                HBluetooth.getInstance().connect(device.getDevice(), UUID.fromString(SPP_UUID), new ConnectDeviceCallback() {
+                    @Override
+                    public void onConnected(HBConnection connection) {
+                        Log.i(TAG, "onConnected: " + connection.getDeviceName());
+                        runOnUiThread(new Runnable() {
                             @Override
-                            public void onConnected(HBConnection connection) {
-                                Log.d(TAG, "onSuccess: connect device: " +
-                                        connection.getDeviceName());
-                                connection.startRead();
-                                refreshDeviceState(connection.getDevcieAddress(),
-                                        BlueDeviceStatus.CONNECTED);
-                                showToast("Device " + connection.getDeviceName()
-                                        + " Is Connected Success.");
-                                connection.registerListener(MainActivity.class.getName(), new HBConnectionListener() {
-                                    @Override
-                                    public void onDisconnected(String address) {
-                                        refreshDeviceState(address, BlueDeviceStatus.DISCONNECTED);
-                                    }
+                            public void run() {
+                                device.setStatus(MyBluetoothDevice.BluetoothDeviceStatus.Connected);
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
+                        connection.registerListener(getClass().getName(), new HBConnectionListener() {
+                            @Override
+                            public void onRead(byte[] bytes) {
+                                String string = new String(bytes);
+                                Log.i(TAG, "onRead: " + string);
+                            }
 
+                            @Override
+                            public void onDisconnected(String address) {
+                                runOnUiThread(new Runnable() {
                                     @Override
-                                    public void onRead(byte[] cache) {
-                                        Log.d(TAG, "onRead: " + cache.toString());
-                                    }
-
-                                    @Override
-                                    public void onError(int code) {
-                                        Log.d(TAG, "onError: " + code);
+                                    public void run() {
+                                        device.setStatus(MyBluetoothDevice.BluetoothDeviceStatus.Disconnect);
+                                        adapter.notifyDataSetChanged();
                                     }
                                 });
                             }
 
                             @Override
-                            public void onError(int code) {
-                                showToast("Connect Device Failed With Code " + code);
-                                refreshDeviceState(device.getAddress(), BlueDeviceStatus.DISCONNECTED);
+                            public void onError(Exception e) {
+                                Log.e(TAG, "onError: ", e);
                             }
                         });
-            } else if (device.getStatus() == BlueDeviceStatus.CONNECTING) {
-                showToast("Device Is Connecting!");
-            } else if (device.getStatus() == BlueDeviceStatus.CONNECTED) {
-//                if (HBUtil.getInstance().disconnectDevice(device.getAddress())) {
-//                    refreshDeviceState(device.getAddress(), BlueDeviceStatus.DISCONNECTED);
-//                } else {
-//                    showToast("Disconnect Device Failed!");
-//                }
-                Intent intent = new Intent(MainActivity.this, WriteActivity.class);
-                intent.putExtra("address", device.getAddress());
-                startActivity(intent);
-            }
-        });
+                        connection.startRead();
+                    }
 
-        mDeviceListView.setAdapter(mDeviceAdapter);
-    }
-
-    private void registerReceiver() {
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
-        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        intentFilter.addAction(BluetoothDevice.ACTION_FOUND);
-        registerReceiver(mBroadcastReceiver, intentFilter);
-    }
-
-    private boolean listContains (BlueDevice blueDevice) {
-        for (BlueDevice device: mDeviceList) {
-            if (device.getAddress().equals(blueDevice.getAddress())) {
-                return true;
+                    @Override
+                    public void onError(Exception e) {
+                        Log.e(TAG, "onError: ", e);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                device.setStatus(MyBluetoothDevice.BluetoothDeviceStatus.Disconnect);
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
+                    }
+                });
             }
         }
-        return false;
-    }
+    };
 
-    private boolean listContains(String address) {
-        for (BlueDevice device: mDeviceList) {
-            if (device.getAddress().equals(address)) {
-                return true;
+    private HBAcceptDeviceListener acceptListener = new HBAcceptDeviceListener() {
+        @Override
+        public void onAccepted(HBConnection connection) {
+
+        }
+
+        @Override
+        public void onError(Exception e) {
+
+        }
+    };
+
+    private BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            Log.d(TAG, "onReceive: action: " + action);
+            switch (action) {
+                case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
+                    break;
+                case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
+                    break;
+                case BluetoothDevice.ACTION_FOUND:
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (!TextUtils.isEmpty(device.getName()) && !isDeviceExist(device)) {
+                        MyBluetoothDevice myDevice = new MyBluetoothDevice(device, MyBluetoothDevice.BluetoothDeviceStatus.Disconnect);
+                        deviceList.add(myDevice);
+                        adapter.notifyDataSetChanged();
+                    }
+                    break;
             }
         }
-        return false;
-    }
-
-    private void refreshDeviceState(String address, BlueDeviceStatus state) {
-        for (BlueDevice device: mDeviceList) {
-            if (device.getAddress().equals(address)) {
-                device.setStatus(state);
-                break;
-            }
-        }
-        runOnUiThread(() -> mDeviceAdapter.notifyDataSetChanged());
-    }
+    };
 }

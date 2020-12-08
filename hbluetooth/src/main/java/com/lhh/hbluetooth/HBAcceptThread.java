@@ -9,37 +9,26 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * 服务端等待连接线程
+ * 等待蓝牙设备连接线程
+ * 唯一观察者为创建该实例的{@link HBluetooth}对象
+ * 在被设备成功连接后，该线程并不会停止，而是会继续等待新的设备连接，所以需要手动停止该线程
  */
 public class HBAcceptThread extends Thread {
-
-    public interface AcceptCallback {
-
-        void onClientConnected(HBConnection connection);
-
-        void onFailed(int code);
-    }
 
     private static final String TAG = "HBAcceptThread";
 
     private BluetoothAdapter adapter;
-
     private String name;
-
     private UUID uuid;
-
-    private AcceptCallback callback;
-
+    private HBAcceptDeviceListener listener;
     private BluetoothServerSocket serverSocket;
 
-    private boolean userCanceled = false;
-
-    public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, AcceptCallback callback) {
-        HBLog.i(TAG, "[AcceptThread-" + name + "] Accept thread create: " + uuid);
+    public HBAcceptThread(BluetoothAdapter adapter, String name, UUID uuid, HBAcceptDeviceListener listener) {
         this.adapter = adapter;
         this.name = name;
         this.uuid = uuid;
-        this.callback = callback;
+        this.listener = listener;
+        HBLog.d(TAG, "[HBAcceptThread-"+name+"] Created");
     }
 
     @Override
@@ -47,50 +36,30 @@ public class HBAcceptThread extends Thread {
         super.run();
         try {
             serverSocket = adapter.listenUsingRfcommWithServiceRecord(name, uuid);
-            BluetoothDevice device;
-            HBConnection connection;
             while (true) {
                 BluetoothSocket socket = serverSocket.accept();
-                device = socket.getRemoteDevice();
-                connection = new HBConnection(device.getName(), device.getAddress(), socket);
-                callback.onClientConnected(connection);
+                BluetoothDevice device = socket.getRemoteDevice();
+                HBConnection connection = new HBConnection(device.getName(), device.getAddress(), socket);
+                listener.onAccepted(connection);
             }
         } catch (IOException e) {
-            if (!userCanceled) {
-                HBLog.e(TAG, "[AcceptThread-" + name + "] Accept device failed: "
-                        + e.getMessage());
-                callback.onFailed(HBConstant.ERROR_CODE_ACCEPT_FAILED);
-            } else {
-                serverSocket = null;
-            }
+            listener.onError(e);
         } finally {
             release();
         }
     }
 
-    public void cancel() {
-        HBLog.i(TAG, "[AcceptThread-" + name + "] Cancel");
-        userCanceled = true;
-        // 触发serverSocket的IO异常，已停止线程
-        try {
-            HBLog.i(TAG, "[AcceptThread-" + name + "] Close server socket");
-            serverSocket.close();
-        } catch (IOException e) {
-            HBLog.e(TAG, "[AcceptThread-" + name + "] Close server socket failed: "
-                    + e.getMessage());
-        }
-    }
-
     private void release() {
         if (serverSocket != null) {
-            HBLog.i(TAG, "[AcceptThread-" + name + "] Close server socket");
             try {
                 serverSocket.close();
-                serverSocket = null;
             } catch (IOException e) {
-                HBLog.e(TAG, "[AcceptThread-" + name + "] Close server socket failed: "
-                        + e.getMessage());
+                e.printStackTrace();
             }
+            serverSocket = null;
+            HBLog.d(TAG, "[HBAcceptThread-"+name+"] ServerSocket is closed");
         }
+
+        listener = null;
     }
 }

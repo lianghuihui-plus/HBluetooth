@@ -12,63 +12,66 @@ import java.util.List;
 
 public class BluetoothDeviceAdapter extends RecyclerView.Adapter<BluetoothDeviceAdapter.ViewHolder> {
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
+    private List<MyBluetoothDevice> deviceList;
+    private OnDeviceItemClickListener onItemClickListener;
 
-        View deviceView;
-        TextView deviceNameText;
-        TextView deviceStatusText;
-
-        public ViewHolder(@NonNull View itemView) {
-            super(itemView);
-            deviceView = itemView;
-            deviceNameText = itemView.findViewById(R.id.device_name);
-            deviceStatusText = itemView.findViewById(R.id.device_status);
-        }
-    }
-
-    private List<BlueDevice> deviceList;
-
-    private BluetoothDeviceItemOnClickListener listener;
-
-    public BluetoothDeviceAdapter(List<BlueDevice> deviceList, BluetoothDeviceItemOnClickListener listener) {
+    public BluetoothDeviceAdapter(List<MyBluetoothDevice> deviceList, OnDeviceItemClickListener listener) {
         this.deviceList = deviceList;
-        this.listener = listener;
+        this.onItemClickListener = listener;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.bluetooth_device_item,
-                parent, false);
-        final ViewHolder holder = new ViewHolder(view);
-        holder.deviceView.setOnClickListener(v -> {
-            BlueDevice device = deviceList.get(holder.getAdapterPosition());
-            listener.onClick(device);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.bluetooth_device_item, parent, false);
+        ViewHolder viewHolder = new ViewHolder(view);
+        viewHolder.view.setOnClickListener(v->{
+            MyBluetoothDevice device = deviceList.get(viewHolder.getAdapterPosition());
+            onItemClickListener.onClick(device);
         });
-        return holder;
+        return viewHolder;
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        BlueDevice device = deviceList.get(position);
-        holder.deviceNameText.setText(device.getName());
-        String state = "";
+        MyBluetoothDevice device = deviceList.get(position);
+        holder.deviceName.setText(device.getDevice().getName());
+        String status = "";
         switch (device.getStatus()) {
-            case DISCONNECTED:
-                state = "未连接";
+            case Disconnect:
+                status = "未连接";
                 break;
-            case CONNECTING:
-                state = "正在连接";
+            case Connecting:
+                status = "连接中";
                 break;
-            case CONNECTED:
-                state = "已连接";
+            case Connected:
+                status = "已连接";
                 break;
         }
-        holder.deviceStatusText.setText(state);
+        holder.deviceStatus.setText(status);
     }
 
     @Override
     public int getItemCount() {
         return deviceList.size();
+    }
+
+    static class ViewHolder extends RecyclerView.ViewHolder {
+
+        View view;
+        TextView deviceName;
+        TextView deviceStatus;
+
+        public ViewHolder(@NonNull View itemView) {
+            super(itemView);
+            view = itemView;
+            deviceName = itemView.findViewById(R.id.device_name);
+            deviceStatus = itemView.findViewById(R.id.device_status);
+        }
+    }
+
+    public interface OnDeviceItemClickListener {
+        void onClick(MyBluetoothDevice device);
     }
 }

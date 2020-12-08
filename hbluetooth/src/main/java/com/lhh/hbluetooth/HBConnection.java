@@ -3,173 +3,186 @@ package com.lhh.hbluetooth;
 import android.bluetooth.BluetoothSocket;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.io.OutputStream;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 蓝牙连接对象，使用了观察者模式
+ * 蓝牙连接对象
+ * 实际控制读写操作，并向观察者反馈数据及状态
+ * 通过定时心跳包监测Socket断开状态
  */
 public class HBConnection {
 
     private static final String TAG = "HBConnection";
 
-    public static final int CONNECTION_STATE_DEAD = 0;
-
-    public static final int CONNECTION_STATE_ALIVE = 1;
-
     private String deviceName;
-
-    private String devcieAddress;
-
-    private int state;
-
+    private String deviceAddress;
     private BluetoothSocket socket;
-
-    private java.io.OutputStream outputStream;
-
+    private ConcurrentHashMap<String, HBConnectionListener> listenerMap;
     private HBReadThread readThread;
+    private OutputStream outputStream;
+    private OutputStream heartBeatSteam;
+    private volatile boolean isDeaded = false;
+    private Timer timer;
 
-    private ConcurrentHashMap<String, HBConnectionListener> connectionListenerHashMap
-            = new ConcurrentHashMap<>();
-
-    private byte[] readCache;
-
-    public HBConnection(String deviceName, String devcieAddress, BluetoothSocket socket) {
-        HBLog.i(TAG, "[Connection-" + deviceName + "] Connection create: " + devcieAddress);
+    public HBConnection(String deviceName, String deviceAddress, BluetoothSocket socket) {
         this.deviceName = deviceName;
-        this.devcieAddress = devcieAddress;
+        this.deviceAddress = deviceAddress;
         this.socket = socket;
+        listenerMap = new ConcurrentHashMap<>();
+        startHeartBeat();
+        HBLog.d(TAG, "[HBConnection-"+deviceName+"] Created");
+    }
 
-        state = CONNECTION_STATE_ALIVE;
+    private void startHeartBeat() {
+        timer = new Timer();
+        timer.schedule(new HeartBeatTask(socket), 1000, 1000);
+    }
+
+    private void cancelHeartBeat() {
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+    }
+
+    public boolean isDeaded() {
+        return isDeaded;
     }
 
     public String getDeviceName() {
         return deviceName;
     }
 
-    public String getDevcieAddress() {
-        return devcieAddress;
-    }
-
-    public int getState() {
-        return state;
-    }
-
-    public boolean startRead() {
-        if (state != CONNECTION_STATE_ALIVE) {
-            HBLog.w(TAG, "[Connection-" + deviceName + "] Start read failed: connection is not alive");
-            return false;
-        }
-        if (readThread != null) {
-            HBLog.w(TAG, "[Connection-" + deviceName + "] Already reading");
-            return true;
-        }
-        HBLog.i(TAG, "[Connection-" + deviceName + "] Start read");
-        readThread = new HBReadThread(deviceName, socket, new HBReadListener() {
-            @Override
-            public void onRead(byte[] cache) {
-                if (readCache == null) {
-                    readCache = cache;
-                } else {
-                    byte[] tmp = Arrays.copyOf(readCache, readCache.length + cache.length);
-                    System.arraycopy(cache, 0, tmp, readCache.length, cache.length);
-                    readCache = tmp;
-                }
-
-                if (connectionListenerHashMap.size() > 0) {
-                    for (HBConnectionListener listener: connectionListenerHashMap.values()) {
-                        listener.onRead(readCache);
-                    }
-                    readCache = null;
-                }
-            }
-
-            @Override
-            public void onError(int code) {
-                for (HBConnectionListener listener: connectionListenerHashMap.values()) {
-                    listener.onError(code);
-                }
-                HBUtil.getInstance().disconnectDevice(devcieAddress);
-            }
-        });
-        readThread.start();
-        return true;
-    }
-
-    public void stopRead() {
-        HBLog.i(TAG, "[Connection-" + deviceName + "] Stop read");
-        if (readThread != null) {
-            readThread.cancel();
-        }
+    public String getDeviceAddress() {
+        return deviceAddress;
     }
 
     public void registerListener(String key, HBConnectionListener listener) {
-        if (state == CONNECTION_STATE_ALIVE) {
-            HBLog.i(TAG, "[Connection-" + deviceName + "] Register listener: " + key);
-            connectionListenerHashMap.put(key, listener);
-        } else {
-            HBLog.w(TAG, "[Connection-" + deviceName + "] Register listener failed: connection is not alive");
+        if (listenerMap != null && !listenerMap.containsKey(key)) {
+            listenerMap.put(key, listener);
         }
     }
 
     public void unregisterListener(String key) {
-        HBLog.i(TAG, "[Connection-" + deviceName + "]  unregister listener: " + key);
-        connectionListenerHashMap.remove(key);
+        if (listenerMap != null) {
+            listenerMap.remove(key);
+        }
     }
 
-    public boolean write(byte[] bytes) {
-        if (state != CONNECTION_STATE_ALIVE) {
-            HBLog.w(TAG, "[Connection-" + deviceName + "] Write failed: connection is not alive");
-            return false;
-        }
+    public void write(byte[] bytes) {
+        if (isDeaded) return;
         try {
-            HBLog.d(TAG, "[Connection-" + deviceName + "] Write buffer len: " + bytes.length);
-            if (outputStream == null) {
+            if (outputStream == null)
                 outputStream = socket.getOutputStream();
-            }
             outputStream.write(bytes);
             outputStream.flush();
         } catch (IOException e) {
-            HBLog.e(TAG, "[Connection-" + deviceName + "] Write failed: " + e.getMessage());
-            return false;
+            HBLog.e(TAG, "[HBConnection-"+deviceName+"] Get output stream error: " + e.getMessage());
         }
-        return true;
     }
 
-    public void die() {
-        HBLog.i(TAG, "[Connection-" + deviceName + "] Die");
-        state = CONNECTION_STATE_DEAD;
-        for (HBConnectionListener listener: connectionListenerHashMap.values()) {
-            listener.onDisconnected(devcieAddress);
-        }
-        release();
+    public void startRead() {
+        if (isDeaded || readThread != null) return;
+        HBLog.d(TAG, "[HBConnection-"+deviceName+"] Start read");
+        readThread = new HBReadThread(deviceName, socket, new HBReadListener() {
+            @Override
+            public void onRead(byte[] bytes) {
+                for (HBConnectionListener listener : listenerMap.values()) {
+                    listener.onRead(bytes);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                for (HBConnectionListener listener: listenerMap.values()) {
+                    listener.onError(e);
+                }
+            }
+        });
+        readThread.start();
     }
 
-    private void release() {
-        connectionListenerHashMap.clear();
+    public void stopRead() {
+        if (readThread != null) {
+            readThread.interrupt();
+        }
+    }
 
+    public void disconnect() {
+        isDeaded = true;
         stopRead();
+        cancelHeartBeat();
 
+        if (heartBeatSteam != null) {
+            try {
+                heartBeatSteam.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            heartBeatSteam = null;
+            HBLog.d(TAG, "[HBConnection-"+deviceName+"] HeartBeatStream is closed");
+        }
         if (outputStream != null) {
-            HBLog.i(TAG, "[Connection-" + deviceName + "] Close output stream");
             try {
                 outputStream.close();
             } catch (IOException e) {
-                HBLog.e(TAG, "[Connection-" + deviceName + "] Close output stream failed: "
-                        + e.getMessage());
+                e.printStackTrace();
             }
             outputStream = null;
+            HBLog.d(TAG, "[HBConnection-"+deviceName+"] OutputStream is closed");
         }
-
         if (socket != null) {
-            HBLog.i(TAG, "[Connection-" + deviceName + "] Close socket");
             try {
                 socket.close();
             } catch (IOException e) {
-                HBLog.e(TAG, "[Connection-" + deviceName + "] Close socket failed: "
-                        + e.getMessage());
+                e.printStackTrace();
             }
             socket = null;
+            HBLog.d(TAG, "[HBConnection-"+deviceName+"] Socket is closed");
+        }
+
+        for (HBConnectionListener listener : listenerMap.values()) {
+            listener.onDisconnected(deviceAddress);
+        }
+        listenerMap = null;
+    }
+
+    private class HeartBeatTask extends TimerTask {
+
+        private OutputStream outputStream;
+
+        public HeartBeatTask(BluetoothSocket socket) {
+            try {
+                outputStream = socket.getOutputStream();
+            } catch (IOException e) {
+                release();
+            }
+        }
+
+        private void release() {
+            HBLog.i(TAG, "[HBConnection-"+deviceName+"] Remote socket is closed");
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                outputStream = null;
+            }
+            cancelHeartBeat();
+            disconnect();
+        }
+
+        @Override
+        public void run() {
+            try {
+                outputStream.write(new byte[]{0x00});
+            } catch (IOException e) {
+                release();
+            }
         }
     }
 }
