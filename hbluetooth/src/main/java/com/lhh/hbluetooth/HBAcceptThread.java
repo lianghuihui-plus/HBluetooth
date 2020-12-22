@@ -49,6 +49,15 @@ public class HBAcceptThread extends Thread {
         }
     }
 
+    public void cancel() {
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     private void release() {
         if (serverSocket != null) {
             try {

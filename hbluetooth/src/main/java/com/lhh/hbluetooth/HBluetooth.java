@@ -90,7 +90,7 @@ public class HBluetooth {
      */
     public void cancelAccept() {
         if (acceptThread != null) {
-            acceptThread.interrupt();
+            acceptThread.cancel();
             acceptThread = null;
         }
     }
