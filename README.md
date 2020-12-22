@@ -14,7 +14,7 @@ Android蓝牙工具，仅封装蓝牙连接相关操作，需用户自行完成�
   
   ```sh
   dependencies {
-        implementation 'com.github.lianghuihui-plus:HBluetooth:v2.0.0'
+        implementation 'com.github.lianghuihui-plus:HBluetooth:v2.0.1'
   }
   ```
 ## 如何使用
